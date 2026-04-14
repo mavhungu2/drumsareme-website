@@ -57,11 +57,12 @@ export default function Home() {
             src="/images/products/featured-drumsticks.jpg"
             alt=""
             fill
-            className="object-cover"
+            sizes="100vw"
+            className="object-contain sm:object-cover object-center"
             priority
           />
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-28 sm:py-40">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-40">
           <div className="max-w-2xl">
             <p className="text-accent font-semibold text-sm uppercase tracking-widest mb-4">
               Keep Time Studio
