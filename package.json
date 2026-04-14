@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "package:afrihost": "bash scripts/package-afrihost.sh",
+    "deploy:firebase": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
@@ -21,6 +23,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "firebase-tools": "^14.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

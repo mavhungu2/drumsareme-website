@@ -8,10 +8,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="md:col-span-1">
             <Image
-              src="/images/logos/logo-white.png"
+              src="/images/logos/logo-white-trimmed.png"
               alt="#DrumsAreMe"
-              width={160}
-              height={48}
+              width={2472}
+              height={827}
               className="h-10 w-auto mb-4"
             />
             <p className="text-sm text-gray-400 leading-relaxed">

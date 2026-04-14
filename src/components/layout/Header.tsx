@@ -22,31 +22,30 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="flex items-center justify-between h-20 sm:h-24">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <Image
-              src="/images/logos/logo-black.png"
+              src="/images/logos/logo-black-trimmed.png"
               alt="#DrumsAreMe"
-              width={160}
-              height={48}
-              className="h-8 sm:h-10 w-auto"
+              width={2472}
+              height={827}
+              className="h-10 sm:h-14 w-auto"
               priority
             />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground transition-colors rounded-lg hover:bg-surface"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
           <div className="flex items-center gap-3">
+            <nav className="hidden md:flex items-center gap-1 mr-2">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground transition-colors rounded-lg hover:bg-surface"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
             <Link
               href="/cart"
               className="relative p-2 text-muted hover:text-foreground transition-colors"

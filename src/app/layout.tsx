@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://drumsareme.co.za";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "#DrumsAreMe | Premium Drumsticks - South Africa",
     template: "%s | #DrumsAreMe",
@@ -33,6 +36,7 @@ export const metadata: Metadata = {
     "drumsticks sale",
   ],
   openGraph: {
+    url: siteUrl,
     title: "#DrumsAreMe | Premium Drumsticks",
     description: "Good Wood Perfected. Premium American Hickory drumsticks from South Africa.",
     type: "website",

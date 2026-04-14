@@ -35,7 +35,7 @@ export default function CartPage() {
       (item) =>
         `${item.quantity}x ${item.product.name} — R${item.product.price * item.quantity}`
     );
-    const msg = `Hi! I'd like to order:\n\n${lines.join("\n")}\n\nTotal: R${totalPrice.toLocaleString()}\n\nPlease let me know payment and delivery details.`;
+    const msg = `Hi! I'd like to order:\n\n${lines.join("\n")}\n\nTotal: R${totalPrice.toLocaleString("en-ZA")}\n\nPlease let me know payment and delivery details.`;
     window.open(
       `https://wa.me/27815569966?text=${encodeURIComponent(msg)}`,
       "_blank"
@@ -126,7 +126,7 @@ export default function CartPage() {
                         </button>
                       </div>
                       <p className="font-semibold text-sm">
-                        R{(item.product.price * item.quantity).toLocaleString()}
+                        R{(item.product.price * item.quantity).toLocaleString("en-ZA")}
                       </p>
                     </div>
                   </div>
@@ -156,7 +156,7 @@ export default function CartPage() {
                         {item.product.name} &times; {item.quantity}
                       </span>
                       <span className="font-medium shrink-0">
-                        R{(item.product.price * item.quantity).toLocaleString()}
+                        R{(item.product.price * item.quantity).toLocaleString("en-ZA")}
                       </span>
                     </div>
                   ))}
@@ -166,7 +166,7 @@ export default function CartPage() {
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
                     <span className="text-xl font-bold">
-                      R{totalPrice.toLocaleString()}
+                      R{totalPrice.toLocaleString("en-ZA")}
                     </span>
                   </div>
                   <p className="text-xs text-muted mt-1">
