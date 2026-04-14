@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "package:afrihost": "bash scripts/package-afrihost.sh",
-    "deploy:firebase": "npm run build && firebase deploy --only hosting"
+    "deploy:firebase": "npm run build && firebase deploy --only hosting,functions,firestore:rules"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",

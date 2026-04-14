@@ -206,3 +206,15 @@ export function getProductsByColor(color: string): Product[] {
 
 export const sizes = ["5A", "5B", "EX5A", "EX5B"] as const;
 export const colors = ["Natural", "Black", "Pink"] as const;
+
+export const SHIPPING_FLAT_ZAR = 100;
+
+export function brickSku(product: Product): Product {
+  return {
+    ...product,
+    id: `${product.id}-brick`,
+    slug: `${product.slug}-brick`,
+    name: `${product.name} — Brick (${product.brickQuantity} pairs)`,
+    price: product.brickPrice,
+  };
+}

@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Minus, Plus, ShoppingCart, Check } from "lucide-react";
-import { products, getProduct } from "@/lib/products";
+import { ArrowLeft, Minus, Plus, ShoppingCart, Check, Package } from "lucide-react";
+import { products, getProduct, brickSku } from "@/lib/products";
 import { useCart } from "@/lib/cart-context";
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
@@ -30,6 +30,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
   const handleAdd = () => {
     addItem(product, quantity);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  };
+
+  const handleAddBrick = () => {
+    addItem(brickSku(product), 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -142,18 +148,20 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
             <div className="mt-8 border border-accent/20 bg-accent/5 rounded-xl p-5">
               <p className="text-sm font-semibold mb-1">
-                Brick Deal — 12 pairs for R{product.brickPrice.toLocaleString("en-ZA")}
+                Brick Deal — {product.brickQuantity} pairs for R
+                {product.brickPrice.toLocaleString("en-ZA")}
               </p>
-              <p className="text-xs text-muted">
+              <p className="text-xs text-muted mb-4">
                 Save R{product.price * product.brickQuantity - product.brickPrice}{" "}
-                per brick.{" "}
-                <Link
-                  href="/contact"
-                  className="text-accent hover:text-accent-dark font-medium"
-                >
-                  Enquire now
-                </Link>
+                per brick vs buying singles.
               </p>
+              <button
+                onClick={handleAddBrick}
+                className="inline-flex items-center gap-2 bg-accent text-foreground px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-accent-dark transition-colors"
+              >
+                <Package size={14} />
+                Add 1 brick to cart
+              </button>
             </div>
           </div>
         </div>

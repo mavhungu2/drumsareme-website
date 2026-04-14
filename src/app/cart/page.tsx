@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ShoppingCart, ArrowRight } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, ArrowRight, Lock } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
+import { SHIPPING_FLAT_ZAR } from "@/lib/products";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, totalPrice } =
     useCart();
+  const shipping = items.length > 0 ? SHIPPING_FLAT_ZAR : 0;
+  const total = totalPrice + shipping;
 
   if (items.length === 0) {
     return (
@@ -29,18 +32,6 @@ export default function CartPage() {
       </div>
     );
   }
-
-  const whatsappOrder = () => {
-    const lines = items.map(
-      (item) =>
-        `${item.quantity}x ${item.product.name} — R${item.product.price * item.quantity}`
-    );
-    const msg = `Hi! I'd like to order:\n\n${lines.join("\n")}\n\nTotal: R${totalPrice.toLocaleString("en-ZA")}\n\nPlease let me know payment and delivery details.`;
-    window.open(
-      `https://wa.me/27815569966?text=${encodeURIComponent(msg)}`,
-      "_blank"
-    );
-  };
 
   return (
     <>
@@ -162,24 +153,30 @@ export default function CartPage() {
                   ))}
                 </div>
 
-                <div className="border-t border-border pt-4 mb-6">
+                <div className="border-t border-border pt-4 mb-6 space-y-2 text-sm">
                   <div className="flex justify-between">
+                    <span className="text-muted">Subtotal</span>
+                    <span>R{totalPrice.toLocaleString("en-ZA")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Shipping</span>
+                    <span>R{shipping.toLocaleString("en-ZA")}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-border mt-2">
                     <span className="font-semibold">Total</span>
                     <span className="text-xl font-bold">
-                      R{totalPrice.toLocaleString("en-ZA")}
+                      R{total.toLocaleString("en-ZA")}
                     </span>
                   </div>
-                  <p className="text-xs text-muted mt-1">
-                    Delivery costs calculated separately
-                  </p>
                 </div>
 
-                <button
-                  onClick={whatsappOrder}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-green text-white px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-green-light transition-colors mb-3"
+                <Link
+                  href="/checkout"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors mb-3"
                 >
-                  Order via WhatsApp
-                </button>
+                  <Lock size={14} />
+                  Checkout
+                </Link>
 
                 <Link
                   href="/products"
