@@ -64,11 +64,17 @@ for ROLE in \
     roles/cloudfunctions.admin \
     roles/run.admin \
     roles/iam.serviceAccountUser \
-    roles/datastore.owner ; do
+    roles/datastore.owner \
+    roles/firebaserules.admin ; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
-    --member="serviceAccount:$SA" --role="$ROLE"
+    --member="serviceAccount:$SA" --role="$ROLE" --condition=None
 done
 ```
+
+`roles/datastore.owner` covers Firestore data; `roles/firebaserules.admin`
+is required for `firebase deploy --only firestore:rules`. If you also
+deploy Storage rules later, add `roles/firebaserules.admin` is
+sufficient.
 
 Alternative: use the [IAM console](https://console.cloud.google.com/iam-admin/iam?project=drumsareme-website).
 
