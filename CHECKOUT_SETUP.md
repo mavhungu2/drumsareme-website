@@ -61,20 +61,37 @@ Hosting Admin only. Functions + Firestore deploys need these extras:
 SA=github-action-1206896954@drumsareme-website.iam.gserviceaccount.com
 PROJECT=drumsareme-website
 for ROLE in \
+    roles/firebase.admin \
     roles/cloudfunctions.admin \
     roles/run.admin \
     roles/iam.serviceAccountUser \
     roles/datastore.owner \
-    roles/firebaserules.admin ; do
+    roles/firebaserules.admin \
+    roles/secretmanager.admin ; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:$SA" --role="$ROLE" --condition=None
 done
 ```
 
-`roles/datastore.owner` covers Firestore data; `roles/firebaserules.admin`
-is required for `firebase deploy --only firestore:rules`. If you also
-deploy Storage rules later, add `roles/firebaserules.admin` is
-sufficient.
+Role rationale:
+- `roles/firebase.admin` — Firebase services umbrella (Hosting, Extensions, etc.)
+- `roles/cloudfunctions.admin` + `roles/run.admin` — deploy Cloud Functions v2
+- `roles/iam.serviceAccountUser` — act as the runtime service account
+- `roles/datastore.owner` — Firestore data access
+- `roles/firebaserules.admin` — deploy `firestore.rules`
+- `roles/secretmanager.admin` — read+attach secrets (`YOCO_SECRET_KEY`, etc.) to functions
+
+Also enable the required GCP APIs once:
+
+```bash
+gcloud services enable \
+  cloudfunctions.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  firebaseextensions.googleapis.com \
+  secretmanager.googleapis.com \
+  --project=drumsareme-website
+```
 
 Alternative: use the [IAM console](https://console.cloud.google.com/iam-admin/iam?project=drumsareme-website).
 
