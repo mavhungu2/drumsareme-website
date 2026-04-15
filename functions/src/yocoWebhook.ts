@@ -8,7 +8,7 @@ import { sendCustomerReceipt, sendMerchantNotification } from "./lib/resend";
 const YOCO_WEBHOOK_SECRET = defineSecret("YOCO_WEBHOOK_SECRET");
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 const MERCHANT_EMAIL = defineString("MERCHANT_EMAIL", {
-  default: "orders@drumsareme.co.za",
+  default: "drumsareme.ent@gmail.com",
 });
 
 interface YocoPaymentPayload {

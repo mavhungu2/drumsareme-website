@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Send, MessageCircle, MapPin, Clock } from "lucide-react";
+import { Send, MessageCircle, Mail, MapPin, Clock } from "lucide-react";
 
 export default function ContactPage() {
   const [formState, setFormState] = useState({
@@ -15,9 +15,8 @@ export default function ContactPage() {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const { name, email, subject, message } = formState;
-    const body = `Name: ${name}%0AEmail: ${email}%0ASubject: ${subject}%0A%0A${message}`;
     window.open(
-      `https://wa.me/27815569966?text=${encodeURIComponent(`New website enquiry\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\n${message}`)}`,
+      `https://wa.me/27832000438?text=${encodeURIComponent(`New website enquiry\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\n${message}`)}`,
       "_blank"
     );
     setSubmitted(true);
@@ -34,8 +33,8 @@ export default function ContactPage() {
             Let&apos;s Talk
           </h1>
           <p className="text-lg text-muted max-w-2xl">
-            Got questions about our sticks? Need a bulk order? Want to stock
-            #DrumsAreMe? Drop us a message.
+            Got questions about our sticks? Want to stock #DrumsAreMe? Drop us
+            a message.
           </p>
         </div>
       </section>
@@ -49,7 +48,7 @@ export default function ContactPage() {
                 <h2 className="text-xl font-bold mb-6">Get in Touch</h2>
                 <div className="space-y-5">
                   <a
-                    href="https://wa.me/27815569966"
+                    href="https://wa.me/27832000438"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-start gap-4 group"
@@ -59,25 +58,23 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="font-medium group-hover:text-green transition-colors">
-                        081 556 9966
+                        083 200 0438
                       </p>
                       <p className="text-sm text-muted">WhatsApp</p>
                     </div>
                   </a>
                   <a
-                    href="https://wa.me/27832000673"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="mailto:drumsareme.ent@gmail.com"
                     className="flex items-start gap-4 group"
                   >
-                    <div className="w-10 h-10 rounded-full bg-green/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <MessageCircle size={18} className="text-green" />
+                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center shrink-0 mt-0.5">
+                      <Mail size={18} className="text-muted" />
                     </div>
                     <div>
-                      <p className="font-medium group-hover:text-green transition-colors">
-                        083 200 0673
+                      <p className="font-medium group-hover:text-foreground transition-colors break-all">
+                        drumsareme.ent@gmail.com
                       </p>
-                      <p className="text-sm text-muted">WhatsApp</p>
+                      <p className="text-sm text-muted">Email</p>
                     </div>
                   </a>
                   <div className="flex items-start gap-4">
@@ -99,14 +96,6 @@ export default function ContactPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="border border-border rounded-2xl p-6 bg-surface">
-                <h3 className="font-semibold mb-2">Bulk & Wholesale</h3>
-                <p className="text-sm text-muted leading-relaxed">
-                  Drum schools, churches, and retailers — ask about our brick
-                  deals (12 pairs for R1,600) and custom wholesale pricing.
-                </p>
               </div>
             </div>
 
@@ -189,7 +178,6 @@ export default function ContactPage() {
                     >
                       <option value="general">General Enquiry</option>
                       <option value="order">Place an Order</option>
-                      <option value="bulk">Bulk / Wholesale</option>
                       <option value="retail">Retail Partnership</option>
                       <option value="other">Other</option>
                     </select>

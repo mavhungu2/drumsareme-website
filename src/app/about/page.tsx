@@ -83,9 +83,11 @@ export default function AboutPage() {
                   weight, balance, and response.
                 </p>
                 <p>
-                  Available in 5A, 5B, EX5A, and EX5B sizes, with Natural, Black,
-                  and Pink finishes — there&apos;s a stick for every player and every
-                  style. And at R150 a pair, you can stock up without guilt.
+                  Available in 7A, 5A, 5B, EX5A, and EX5B sizes, in a full
+                  range of finishes — Natural, Black, Pink, Red, Green, Blue,
+                  Yellow, and our premium Silver Blade — there&apos;s a stick for
+                  every player and every style. And at R150 a pair, you can
+                  stock up without guilt.
                 </p>
               </div>
             </div>
@@ -161,7 +163,7 @@ export default function AboutPage() {
           </h2>
           <p className="text-muted max-w-md mx-auto mb-8">
             We work with drum shops, music schools, and churches across South
-            Africa. Get in touch for wholesale pricing.
+            Africa. Get in touch to become a stockist.
           </p>
           <Link
             href="/contact"

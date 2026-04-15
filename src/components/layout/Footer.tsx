@@ -25,7 +25,7 @@ export default function Footer() {
               Shop
             </h3>
             <ul className="space-y-2.5">
-              {["5A Sticks", "5B Sticks", "EX5A Sticks", "EX5B Sticks"].map(
+              {["7A Sticks", "5A Sticks", "5B Sticks", "EX5A Sticks", "EX5B Sticks"].map(
                 (item) => (
                   <li key={item}>
                     <Link
@@ -70,29 +70,27 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm text-gray-400">
               <li>
                 <a
-                  href="https://wa.me/27815569966"
+                  href="https://wa.me/27832000438"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-white transition-colors"
                 >
-                  WhatsApp: 081 556 9966
+                  WhatsApp: 083 200 0438
                 </a>
               </li>
               <li>
                 <a
-                  href="https://wa.me/27832000673"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
+                  href="mailto:drumsareme.ent@gmail.com"
+                  className="hover:text-white transition-colors break-all"
                 >
-                  WhatsApp: 083 200 0673
+                  drumsareme.ent@gmail.com
                 </a>
               </li>
               <li>South Africa</li>
             </ul>
             <div className="flex gap-4 mt-6">
               <a
-                href="https://instagram.com/drumsareme"
+                href="https://www.instagram.com/drumsareme_"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-white transition-colors"
@@ -103,7 +101,7 @@ export default function Footer() {
                 </svg>
               </a>
               <a
-                href="https://facebook.com/drumsareme"
+                href="https://web.facebook.com/profile.php?id=61586377460595"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-white transition-colors"
@@ -114,7 +112,7 @@ export default function Footer() {
                 </svg>
               </a>
               <a
-                href="https://tiktok.com/@drumsareme"
+                href="https://www.tiktok.com/@drumsareme"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-white transition-colors"

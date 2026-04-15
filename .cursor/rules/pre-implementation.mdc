@@ -1,0 +1,173 @@
+---
+description: Full development workflow — context gathering, implementation standards, verification, and multi-agent orchestration
+alwaysApply: true
+---
+
+# Development Workflow
+
+## 1. Pre-Implementation: Plan First
+
+**Always switch to Plan Mode before implementing anything, no matter how small the change.** Gather context, outline the approach, confirm the plan, and only then switch to Agent Mode to implement. No exceptions — even single-line fixes deserve a quick plan to avoid unintended side effects.
+
+### Full Context Gathering
+
+Before writing any code, perform a **full-stack audit** of the affected area. Never implement based on assumptions.
+
+### Read the Docs First
+
+- **Next.js app** (`src/app/`): Read `README.md`, `AGENTS.md`, and `CLAUDE.md`
+- **Cloud Functions** (`functions/`): Read `CHECKOUT_SETUP.md` for checkout flow and Resend/Yoco config
+- **Deployment**: Read `.github/workflows/` for the Firebase Hosting deploy pipeline
+
+### Full Data Flow Audit
+
+Trace every change through the **entire stack** before implementing:
+
+1. **Firestore** — `firestore.rules`, collection shape, data expected by Cloud Functions
+2. **Cloud Functions** — `functions/src/` routes: `createCheckout.ts`, `getOrder.ts`, `yocoWebhook.ts`
+3. **Frontend** — `src/app/` (Next.js App Router) pages, `src/components/` layout, `src/lib/` (products catalog, cart context, blog)
+4. **Shared types** — `Product` interface is defined in both `src/lib/products.ts` and `functions/src/lib/products.ts`; they MUST stay in sync
+
+### DRY & SOLID Check
+
+During the audit, evaluate the existing code for:
+
+- **DRY violations** — duplicated logic that should be extracted into shared utilities, services, or composables
+- **SOLID violations** — single responsibility, open/closed, interface segregation, dependency inversion
+- **Dead code** — remove unused imports, unreachable branches, commented-out code
+- **Declarative style** — prefer expressions over statements, data-driven patterns over imperative logic
+- **Framework idioms** — proper use of Next.js App Router conventions, React Server Components vs Client Components (`"use client"`), Tailwind utility-first patterns
+
+Flag any code smells or architectural concerns encountered, even outside the immediate scope of the change.
+
+### Project Conventions Check
+
+Before implementing, check the project's existing conventions and structure:
+
+- File naming (kebab-case for routes, PascalCase for components)
+- Client vs Server components (`"use client"` directive only where needed)
+- Tailwind class ordering and the custom color tokens in `globals.css` (`bg-foreground`, `text-muted`, `bg-surface`, `border-border`)
+- Image paths follow `/images/{gallery,logos,products}/` under `public/`
+- Cart state via `src/lib/cart-context.tsx`, products from `src/lib/products.ts`
+
+Follow existing patterns. Ask for clarification if conventions are unclear or conflicting.
+
+## 2. Project Structure
+
+This is a single Next.js 15 App Router project with a Firebase Functions backend.
+
+| Area | Stack | Notes |
+|---|---|---|
+| `src/app/` | Next.js 15 App Router + TypeScript + Tailwind v4 | Static-exported site, no SSR |
+| `functions/` | Node.js + TypeScript + Firebase Functions v2 | Yoco payments + Resend email |
+| `public/` | Static assets | Images, SVGs, `.htaccess` for Afrihost |
+
+### Key Details
+
+- Next.js must be treated as "NOT the Next.js you know" per `AGENTS.md` — breaking changes from training-data conventions are possible. Read `node_modules/next/dist/docs/` before writing route code.
+- Site is deployed to Firebase Hosting via GitHub Actions (`.github/workflows/firebase-hosting-*.yml`).
+- Checkout runs through Yoco; order confirmations via Resend. See `CHECKOUT_SETUP.md` for env vars and setup.
+- No database schema/migrations — products are in-memory in `src/lib/products.ts`.
+
+## 3. Starting the Project
+
+```bash
+npm run dev        # Next.js dev server, localhost:3000
+npm run build      # Production build — run before commit
+npm run lint       # ESLint
+```
+
+For Cloud Functions locally:
+```bash
+cd functions && npm run build && npm run serve
+```
+
+## 4. Implementation Standards
+
+### Code Quality
+
+- **Always use latest package versions** when adding dependencies
+- **Always implement loading states and error states** for async operations
+- **No dead code** — no commented-out code, no unused imports, no unreachable branches
+- **Extract shared logic** — utilities, services, composables before repeating code
+- **Prefer declarative** — expressions over statements, data-driven over imperative
+- Make suggestions for best practices and improvements when you spot opportunities
+
+### When Removing Code
+
+Before deleting anything, check **all areas of the app involved**:
+
+1. Firestore rules — will removing this leave orphaned collections or rules?
+2. Cloud Functions — are `createCheckout.ts`, `getOrder.ts`, or `yocoWebhook.ts` referencing this?
+3. Frontend — are other pages, components, or the cart context depending on this?
+4. Shared types — `Product` is duplicated in `src/lib/products.ts` and `functions/src/lib/products.ts` — update both.
+
+### Build and Lint
+
+After implementation, always:
+1. Build the project (`npm run build`) to catch compile errors
+2. Run lint (`npm run lint`) to catch style issues
+3. Fix any errors or warnings introduced by your changes
+
+## 5. Post-Implementation Verification
+
+After every implementation:
+
+1. Run `npm run dev` and open `http://localhost:3000`
+2. **Interactive test** — click through the affected flows in the browser, add to cart, visit product detail pages, submit checkout if applicable. Do not assume the code works.
+3. Check the browser console for runtime errors
+4. Run `npm run build` to confirm the production bundle compiles
+5. If the change touches Cloud Functions, also test locally via `firebase emulators:start`
+
+## 6. Multi-Agent Team Structure
+
+Operate as a multi-agent development team for faster delivery with higher quality.
+
+### Main Thread: Context & Orchestration
+
+- Gather and maintain context — requirements, constraints, acceptance criteria
+- Ask clarifying questions early to prevent rework
+- Identify where changes belong in the architecture; reuse existing modules before creating new ones
+- Provide Dev and Dev 2 with structured briefs: expected behavior, inputs/outputs, edge cases, verification criteria
+- Partition work clearly between agents to avoid file-level conflicts
+
+### Dev Agent: Implementation & Debugging
+
+- All production code: new features, bug fixes, performance, security, refactoring
+- Prioritise DRY, modular, declarative, maintainable code
+- Reuse existing services, utilities, and types — only introduce new abstractions when justified
+- Implement with testability in mind
+- Communicate trade-offs, assumptions, and risks
+
+### Dev 2 Agent: Parallel Implementation (Principal/Tech Lead)
+
+Spawn for significant work — large features, complex refactors, multi-module changes.
+
+Dev 2 enforces strict standards:
+- **Clean code**: No dead code, no commented-out code, no unnecessary complexity
+- **Declarative style**: Expressions over statements, data-driven over imperative
+- **DRY**: Extract shared logic before repeating it
+- **SOLID principles**: Separation of concerns, proper framework idioms
+- **Opinionated reviewer**: Challenges approaches that sacrifice long-term maintainability
+
+Dev 2 reports: what was implemented, patterns applied, what was refactored/rejected and why, risks and follow-ups.
+
+### Workflow
+
+1. **Main thread** gathers context, clarifies requirements, produces plan with architecture mapping
+2. **Dev** (and **Dev 2** for significant work) implements according to plan, reports gaps or risks
+3. Main thread performs final synthesis: confirm acceptance criteria, outline changes, list follow-ups
+
+## 7. Git Commits & Pull Requests
+
+- Never add "Co-Authored-By: Claude" or any AI attribution to commit messages
+- Write commit messages without any AI authorship credits
+- Focus commit messages on the "why" not the "what"
+- **All pull requests target the `main` branch** — this repo has no `dev` branch
+
+## 8. General Principles
+
+- **Ask for clarification** when requirements are ambiguous — do not guess
+- **Default to production-ready** — optimise for maintainability and long-term speed, not short-term hacks
+- **Security, performance, and reliability** are always considered
+- **Make suggestions** for best practices and improvements proactively

@@ -33,8 +33,9 @@ export default function ProductsPage() {
             All Drumsticks
           </h1>
           <p className="text-lg text-muted max-w-2xl">
-            Premium American Hickory drumsticks. R150 per pair. Available in
-            4 sizes and 3 finishes.
+            Premium American Hickory drumsticks. From R150 per pair. Available
+            in 5 sizes and a full range of colours, plus our premium Silver
+            Blade edition.
           </p>
         </div>
       </section>
@@ -150,24 +151,6 @@ export default function ProductsPage() {
               </button>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Brick Deal */}
-      <section className="bg-surface border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <h2 className="text-2xl font-bold mb-2">
-            Brick Deal — 12 Pairs for R1,600
-          </h2>
-          <p className="text-muted mb-6">
-            Save R200 when you buy a full brick. Mix and match sizes and colors.
-          </p>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 bg-foreground text-white px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors"
-          >
-            Order a Brick
-          </Link>
         </div>
       </section>
     </>

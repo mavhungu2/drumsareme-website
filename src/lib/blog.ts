@@ -14,9 +14,15 @@ export const blogPosts: BlogPost[] = [
     slug: "choosing-the-right-drumstick-size",
     title: "How to Choose the Right Drumstick Size",
     excerpt:
-      "5A or 5B? Extended or standard? Here's everything you need to know about picking the perfect stick for your playing style.",
+      "7A, 5A, or 5B? Extended or standard? Here's everything you need to know about picking the perfect stick for your playing style.",
     content: `
 Choosing the right drumstick is one of the most important decisions a drummer can make. The stick you play with affects your tone, volume, speed, and comfort behind the kit. Here's a breakdown of our sizes and who they're best for.
+
+## 7A — Light & Fast
+
+The 7A is our lightest stick — slimmer than a 5A, built for speed and finesse. If you play quiet gigs, jazz, or anything that calls for a light touch, this is your stick.
+
+**Best for:** Jazz, light-touch styles, practice, quieter venues
 
 ## 5A — The All-Rounder
 
@@ -44,11 +50,11 @@ The biggest stick in our range. Combines the 5B's extra mass with extended lengt
 
 ## The Color Question
 
-All our sticks come in Natural, Black, and Pink finishes. The finish is purely cosmetic — same wood, same weight, same performance. Pick the color that matches your personality.
+Our sticks come in a full range of finishes — Natural, Black, Pink, Red, Green, Blue, Yellow, plus our premium Silver Blade edition. The finish is purely cosmetic — same wood, same weight, same performance. Pick the color that matches your personality.
 
 ## Our Recommendation
 
-Start with a pair of 5A Naturals. They're the benchmark. Once you know how they feel, you'll know exactly what direction to go — lighter, heavier, longer, or more colourful.
+Start with a pair of 5A Naturals. They're the benchmark. Once you know how they feel, you'll know exactly what direction to go — lighter (7A), heavier (5B), longer (EX5A/EX5B), or more colourful.
     `.trim(),
     date: "2026-03-15",
     readTime: "4 min read",
@@ -89,50 +95,6 @@ We didn't reinvent the drumstick. We just made sure every pair meets the standar
     readTime: "3 min read",
     image: "/images/gallery/20260110_170314.jpg",
     category: "Education",
-  },
-  {
-    slug: "brick-deal-explained",
-    title: "The Brick Deal: Why Every Serious Drummer Needs One",
-    excerpt:
-      "12 pairs for R1,600. Here's why buying in bulk is the smartest move for working drummers, drum schools, and worship teams.",
-    content: `
-If you go through drumsticks regularly — and let's be honest, most of us do — buying single pairs gets expensive fast. That's why we created the Brick Deal.
-
-## What's a Brick?
-
-A brick is 12 pairs of drumsticks. It's an industry-standard bulk unit, and it's the smartest way to buy sticks if you play regularly.
-
-## The Numbers
-
-- **Single pair:** R150
-- **12 pairs (brick):** R1,600
-- **You save:** R200 per brick
-- **Per pair in a brick:** R133
-
-That's a saving of R16.67 per pair. Over a year, that adds up significantly.
-
-## Who Benefits Most?
-
-**Working Drummers** — If you gig regularly, you're going through sticks fast. A brick keeps you stocked without constant reordering.
-
-**Drum Schools** — Teaching drums means students need sticks. A brick deal keeps your school supplied at the lowest per-pair cost.
-
-**Worship Teams** — Churches with multiple drummers can stock the drum room and keep everyone playing with quality sticks.
-
-**Session Drummers** — When you're in the studio, the last thing you want is a stick breaking mid-take with no backup.
-
-## Mix and Match
-
-You can mix sizes and colours within a brick. Want 6 pairs of 5A Natural and 6 pairs of 5A Black? No problem. We'll build your brick to order.
-
-## How to Order
-
-Simply WhatsApp us at 081 556 9966 or 083 200 0673 with your brick order. We'll sort payment and delivery.
-    `.trim(),
-    date: "2026-02-10",
-    readTime: "3 min read",
-    image: "/images/products/drumsticks-sale.png",
-    category: "Tips",
   },
 ];
 

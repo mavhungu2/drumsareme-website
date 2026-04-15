@@ -39,11 +39,18 @@ firebase functions:secrets:set YOCO_WEBHOOK_SECRET
 firebase functions:secrets:set RESEND_API_KEY
 ```
 
-Optional non-secret override (defaults to `orders@drumsareme.co.za`):
+Optional non-secret override (defaults to `drumsareme.ent@gmail.com`):
 
 ```bash
-firebase functions:config:set runtime.merchant_email="orders@drumsareme.co.za"
+firebase functions:config:set runtime.merchant_email="drumsareme.ent@gmail.com"
 ```
+
+Note: Resend requires a verified sender domain. The `from:` address in
+`functions/src/lib/resend.ts` stays on the verified `drumsareme.co.za`
+domain — the merchant notification email above is only the *recipient*
+address (where order notifications are delivered). To send *from*
+`drumsareme.ent@gmail.com`, Gmail cannot be verified with Resend; use
+Gmail's own SMTP or keep the verified domain as the sender.
 
 ## 4. Grant extra IAM to the CI service account
 
@@ -130,8 +137,7 @@ Client:
 - `src/app/checkout/success/page.tsx` — polls `GET /api/orders/:id`, clears cart on paid.
 - `src/app/checkout/cancelled/page.tsx` — fallback for cancel/fail.
 - `src/app/cart/page.tsx` — WhatsApp CTA replaced by Checkout link + shipping line.
-- `src/app/products/[slug]/product-detail-client.tsx` — "Add 1 brick" button.
-- `src/lib/products.ts` — exports `SHIPPING_FLAT_ZAR`, `brickSku()`.
+- `src/lib/products.ts` — exports `SHIPPING_FLAT_ZAR` and the client product catalog.
 
 Infra:
 - `firebase.json` — `rewrites` for `/api/*`, `functions`, `firestore` blocks.

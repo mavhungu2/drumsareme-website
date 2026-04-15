@@ -10,21 +10,21 @@ const featuredProducts = [
     tag: "Best Seller",
   },
   {
-    name: "5A Black",
-    slug: "5a-black",
-    image: "/images/gallery/20260110_170351.jpg",
-    tag: "Popular",
+    name: "5A Silver Blade",
+    slug: "5a-silver-blade",
+    image: "/images/gallery/20260110_170349.jpg",
+    tag: "Premium",
   },
   {
-    name: "5A Pink",
-    slug: "5a-pink",
-    image: "/images/gallery/20260110_170406.jpg",
+    name: "7A Blue",
+    slug: "7a-blue",
+    image: "/images/gallery/IMG_7494.jpg",
     tag: "New",
   },
   {
     name: "5B Natural",
     slug: "5b-natural",
-    image: "/images/gallery/20260110_170024.jpg",
+    image: "/images/gallery/20260110_170118.jpg",
     tag: "Power",
   },
 ];
@@ -42,7 +42,7 @@ const testimonials = [
   },
   {
     name: "James R.",
-    text: "Switched my whole drum school to Keep Time. Great quality at an unbeatable price. The brick deal is incredible value.",
+    text: "Switched my whole drum school to Keep Time. Great quality at an unbeatable price — the full colour range is a bonus.",
     rating: 5,
   },
 ];
@@ -171,42 +171,6 @@ export default function Home() {
               View All Products
               <ArrowRight size={14} />
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Brick Deal Banner */}
-      <section className="bg-foreground text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16">
-            <div className="flex-1">
-              <p className="text-accent font-semibold text-sm uppercase tracking-widest mb-3">
-                Bulk Deal
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                Brick Deal — 12 Pairs for R1,600
-              </h2>
-              <p className="text-gray-400 leading-relaxed mb-8 max-w-md">
-                Stock up and save. Perfect for drum schools, worship teams,
-                session drummers, and anyone who goes through sticks fast. That's
-                just R133 per pair.
-              </p>
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 bg-accent text-foreground px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-accent-dark transition-colors"
-              >
-                Enquire Now
-                <ArrowRight size={16} />
-              </Link>
-            </div>
-            <div className="relative w-full md:w-80 aspect-[3/4] rounded-2xl overflow-hidden shrink-0">
-              <Image
-                src="/images/products/drumsticks-sale.png"
-                alt="Brick Deal - 12 pairs for R1600"
-                fill
-                className="object-cover"
-              />
-            </div>
           </div>
         </div>
       </section>
