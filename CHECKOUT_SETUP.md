@@ -90,6 +90,8 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   firebaseextensions.googleapis.com \
   secretmanager.googleapis.com \
+  run.googleapis.com \
+  eventarc.googleapis.com \
   --project=drumsareme-website
 ```
 
