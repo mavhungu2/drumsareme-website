@@ -25,6 +25,6 @@ jobs:
       - name: Deploy functions and Firestore rules
         uses: w9jds/firebase-action@v14.9.0
         with:
-          args: deploy --only functions,firestore:rules --project drumsareme-website --non-interactive
+          args: deploy --only functions,firestore:rules --project drumsareme-website --non-interactive --force
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DRUMSAREME_WEBSITE }}
