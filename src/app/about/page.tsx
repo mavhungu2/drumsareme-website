@@ -46,8 +46,8 @@ export default function AboutPage() {
               We live and breathe drums.
             </h1>
             <p className="text-lg text-muted leading-relaxed max-w-2xl">
-              #DrumsAreMe started with a simple belief: South African drummers
-              deserve premium sticks at a price that doesn&apos;t break the bank.
+              #DrumsAreMe started with a simple belief: drummers deserve
+              premium sticks at a price that doesn&apos;t break the bank.
               Every pair of Keep Time Studio sticks is built on that promise.
             </p>
           </div>

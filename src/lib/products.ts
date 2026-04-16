@@ -86,8 +86,7 @@ export const products: Product[] = [
       "Light, fast profile",
       "Smooth grip coating",
     ],
-    // TODO: awaiting dedicated 7A Red product photo; using 7A Natural as placeholder
-    image: "/images/gallery/IMG_7489.jpg",
+    image: "/images/gallery/7a-red.jpg",
     inStock: true,
   },
 
@@ -153,46 +152,6 @@ export const products: Product[] = [
     inStock: true,
   },
   {
-    id: "5a-red",
-    slug: "5a-red",
-    name: "Keep Time 5A - Red",
-    size: "5A",
-    color: "Red",
-    price: 150,
-    description:
-      "The all-rounder 5A in bold red. Same reliable feel, more personality.",
-    features: [
-      "American Hickory wood",
-      "Bold red finish",
-      "Oval wood tip",
-      "Length: 406mm (16\")",
-      "Diameter: 14.4mm (.565\")",
-      "Smooth grip coating",
-    ],
-    image: "/images/gallery/IMG_7485.jpg",
-    inStock: true,
-  },
-  {
-    id: "5a-green",
-    slug: "5a-green",
-    name: "Keep Time 5A - Green",
-    size: "5A",
-    color: "Green",
-    price: 150,
-    description:
-      "The all-rounder 5A in vivid green. Classic balance and feel with a finish built for the spotlight.",
-    features: [
-      "American Hickory wood",
-      "Vivid green finish",
-      "Oval wood tip",
-      "Length: 406mm (16\")",
-      "Diameter: 14.4mm (.565\")",
-      "Smooth grip coating",
-    ],
-    image: "/images/gallery/IMG_7483.jpg",
-    inStock: true,
-  },
-  {
     id: "5a-blue",
     slug: "5a-blue",
     name: "Keep Time 5A - Blue",
@@ -249,8 +208,7 @@ export const products: Product[] = [
       "Diameter: 14.4mm (.565\")",
       "Balanced weight distribution",
     ],
-    // TODO: awaiting dedicated Silver Blade product photo; using 5A Natural as placeholder
-    image: "/images/gallery/20260110_170349.jpg",
+    image: "/images/gallery/5a-silver-blade.jpg",
     inStock: true,
   },
 

@@ -22,8 +22,6 @@ const catalogList: ServerProduct[] = [
   { id: "5a-natural", name: "Keep Time 5A - Natural", price: 150 },
   { id: "5a-black", name: "Keep Time 5A - Black", price: 150 },
   { id: "5a-pink", name: "Keep Time 5A - Pink", price: 150 },
-  { id: "5a-red", name: "Keep Time 5A - Red", price: 150 },
-  { id: "5a-green", name: "Keep Time 5A - Green", price: 150 },
   { id: "5a-blue", name: "Keep Time 5A - Blue", price: 150 },
   { id: "5a-yellow", name: "Keep Time 5A - Yellow", price: 150 },
   { id: "5a-silver-blade", name: "Keep Time 5A - Silver Blade", price: 180 },
