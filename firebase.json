@@ -5,6 +5,8 @@
     "rewrites": [
       { "source": "/api/checkout", "function": "createCheckout" },
       { "source": "/api/yoco/webhook", "function": "yocoWebhook" },
+      { "source": "/api/admin/orders", "function": "adminListOrders" },
+      { "source": "/api/admin/orders/**", "function": "adminOrderActions" },
       { "source": "/api/orders/**", "function": "getOrder" }
     ],
     "headers": [
@@ -25,6 +27,7 @@
     "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }

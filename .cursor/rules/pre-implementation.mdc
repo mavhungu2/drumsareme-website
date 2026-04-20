@@ -109,7 +109,39 @@ After implementation, always:
 2. Run lint (`npm run lint`) to catch style issues
 3. Fix any errors or warnings introduced by your changes
 
-## 5. Post-Implementation Verification
+## 5. Firestore & Firebase Verification
+
+Connect to the **Firebase project** (dev emulator and prod) to verify how changes will affect each environment:
+
+- Inspect existing Firestore documents in the `orders/` and `counters/` collections before changing the shape read by Cloud Functions
+- Verify `firestore.rules` still denies all client access (admin data flows through authenticated Cloud Functions only)
+- When adding composite queries, update `firestore.indexes.json` and re-deploy — do not rely on console auto-suggestions
+- Confirm `ADMIN_UIDS` in `functions/.env.drumsareme-website` still contains current admin UIDs before deploying functions
+- Check that secrets referenced via `defineSecret` (`RESEND_API_KEY`, `YOCO_SECRET_KEY`, `YOCO_WEBHOOK_SECRET`) exist: `firebase functions:secrets:access <NAME>`
+
+### Firebase Access
+
+```bash
+# Active project
+firebase use                                    # confirms drumsareme-website
+
+# Inspect params + secrets
+firebase apps:sdkconfig WEB                     # prints NEXT_PUBLIC_FIREBASE_* config
+firebase functions:secrets:access RESEND_API_KEY
+
+# Run rules + functions locally against emulators
+firebase emulators:start --only firestore,functions,hosting
+```
+
+### Before Deploying
+
+1. Verify `.env.local` (frontend) matches `firebase apps:sdkconfig WEB`
+2. Verify `functions/.env.drumsareme-website` has `ADMIN_UIDS`, `SITE_URL`, `MERCHANT_EMAIL`
+3. Verify `firestore.rules` + `firestore.indexes.json` reflect current query needs
+4. Run `npm run build` at the repo root (produces `out/`) AND `cd functions && npm run build`
+5. For destructive schema changes, smoke-test against the Firestore emulator first
+
+## 6. Post-Implementation Verification
 
 After every implementation:
 
@@ -118,8 +150,9 @@ After every implementation:
 3. Check the browser console for runtime errors
 4. Run `npm run build` to confirm the production bundle compiles
 5. If the change touches Cloud Functions, also test locally via `firebase emulators:start`
+6. For admin dashboard changes, sign in at `/admin/` and exercise the list + detail views; check Cloud Functions logs via `firebase functions:log` for any 4xx/5xx
 
-## 6. Multi-Agent Team Structure
+## 7. Multi-Agent Team Structure
 
 Operate as a multi-agent development team for faster delivery with higher quality.
 
@@ -158,14 +191,14 @@ Dev 2 reports: what was implemented, patterns applied, what was refactored/rejec
 2. **Dev** (and **Dev 2** for significant work) implements according to plan, reports gaps or risks
 3. Main thread performs final synthesis: confirm acceptance criteria, outline changes, list follow-ups
 
-## 7. Git Commits & Pull Requests
+## 8. Git Commits & Pull Requests
 
 - Never add "Co-Authored-By: Claude" or any AI attribution to commit messages
 - Write commit messages without any AI authorship credits
 - Focus commit messages on the "why" not the "what"
 - **All pull requests target the `main` branch** — this repo has no `dev` branch
 
-## 8. General Principles
+## 9. General Principles
 
 - **Ask for clarification** when requirements are ambiguous — do not guess
 - **Default to production-ready** — optimise for maintainability and long-term speed, not short-term hacks

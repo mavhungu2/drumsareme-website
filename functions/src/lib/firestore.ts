@@ -27,9 +27,21 @@ export interface Customer {
   notes?: string;
 }
 
+export interface OrderNote {
+  at: FirebaseFirestore.Timestamp;
+  by: string;
+  body: string;
+}
+
+export interface OrderTracking {
+  carrier: string;
+  number: string;
+  url?: string;
+}
+
 export interface Order {
   ref: string;
-  status: "pending" | "paid" | "failed";
+  status: "pending" | "paid" | "failed" | "shipped" | "cancelled";
   items: OrderItem[];
   subtotal: number;
   shipping: number;
@@ -42,6 +54,11 @@ export interface Order {
   };
   createdAt: FirebaseFirestore.Timestamp;
   paidAt?: FirebaseFirestore.Timestamp;
+  shippedAt?: FirebaseFirestore.Timestamp;
+  cancelledAt?: FirebaseFirestore.Timestamp;
+  receiptResendAt?: FirebaseFirestore.Timestamp;
+  tracking?: OrderTracking;
+  notes?: OrderNote[];
 }
 
 export async function generateOrderRef(): Promise<string> {
