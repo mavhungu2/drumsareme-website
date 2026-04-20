@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { GoogleAuthProvider, getAuth, type Auth } from "firebase/auth";
+import { FIREBASE_WEB_APP_CONFIG } from "./firebase-web-app-config";
 
 interface FirebaseClientConfig {
   apiKey: string;
@@ -11,13 +12,17 @@ interface FirebaseClientConfig {
 }
 
 function readConfig(): FirebaseClientConfig {
+  const fallback = FIREBASE_WEB_APP_CONFIG;
   const config = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? fallback.apiKey,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? fallback.authDomain,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? fallback.projectId,
+    storageBucket:
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? fallback.storageBucket,
+    messagingSenderId:
+      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
+      fallback.messagingSenderId,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? fallback.appId,
   };
 
   const missing = Object.entries(config)
@@ -27,11 +32,11 @@ function readConfig(): FirebaseClientConfig {
   if (missing.length > 0) {
     throw new Error(
       `Firebase client config is missing: ${missing.join(", ")}. ` +
-        "Copy .env.local.example to .env.local and fill in the Firebase Web config.",
+        "Set NEXT_PUBLIC_FIREBASE_* in .env.local or update firebase-web-app-config.ts.",
     );
   }
 
-  return config as FirebaseClientConfig;
+  return config;
 }
 
 function camelToSnake(key: string): string {
