@@ -33,9 +33,8 @@ export default function SignInGate() {
           Admin sign-in
         </h1>
         <p className="mt-2 text-sm text-muted leading-relaxed">
-          Sign in with an authorised Google account to manage orders. Access is
-          restricted to an allowlist of admin accounts — unauthorised sign-ins
-          will be rejected by the server.
+          Sign in with an authorised Google account to manage orders and
+          admins. Unauthorised sign-ins will be rejected by the server.
         </p>
         <button
           type="button"

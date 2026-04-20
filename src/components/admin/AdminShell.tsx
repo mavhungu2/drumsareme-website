@@ -3,7 +3,13 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Loader2, LogOut, ShoppingBag, User as UserIcon } from "lucide-react";
+import {
+  Loader2,
+  LogOut,
+  ShoppingBag,
+  User as UserIcon,
+  Users,
+} from "lucide-react";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import SignInGate from "./SignInGate";
 
@@ -20,6 +26,12 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
     label: "Orders",
     icon: ShoppingBag,
     match: (pathname) => pathname.startsWith("/admin/orders"),
+  },
+  {
+    href: "/admin/users/",
+    label: "Admins",
+    icon: Users,
+    match: (pathname) => pathname.startsWith("/admin/users"),
   },
 ];
 

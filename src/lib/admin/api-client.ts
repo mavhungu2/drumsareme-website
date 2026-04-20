@@ -1,5 +1,12 @@
 import { ADMIN_API_BASE, getFirebaseAuth } from "@/lib/firebase-client";
 import type {
+  AddAdminInput,
+  AdminApiCode,
+  AdminListItem,
+  ListAdminsResponse,
+  RemoveAdminResponse,
+} from "./admins-types";
+import type {
   ListOrdersQuery,
   ListOrdersResponse,
   Order,
@@ -10,12 +17,19 @@ import type {
 export class AdminApiError extends Error {
   readonly status: number;
   readonly retryAfterSeconds?: number;
+  readonly code?: AdminApiCode;
 
-  constructor(status: number, message: string, retryAfterSeconds?: number) {
+  constructor(
+    status: number,
+    message: string,
+    retryAfterSeconds?: number,
+    code?: AdminApiCode,
+  ) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.code = code;
   }
 }
 
@@ -42,21 +56,32 @@ function buildUrl(path: string, query?: Record<string, string | number | undefin
   return qs ? `${url}?${qs}` : url;
 }
 
-async function readError(response: Response): Promise<string> {
+interface ErrorBody {
+  message: string;
+  code?: AdminApiCode;
+}
+
+async function readError(response: Response): Promise<ErrorBody> {
   try {
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      const body = (await response.json()) as { error?: string; message?: string };
-      if (typeof body.error === "string") return body.error;
-      if (typeof body.message === "string") return body.message;
-    } else {
-      const text = await response.text();
-      if (text) return text;
+      const body = (await response.json()) as {
+        error?: string;
+        message?: string;
+        code?: AdminApiCode;
+      };
+      const message =
+        (typeof body.error === "string" && body.error) ||
+        (typeof body.message === "string" && body.message) ||
+        `Request failed with status ${response.status}`;
+      return { message, code: body.code };
     }
+    const text = await response.text();
+    if (text) return { message: text };
   } catch {
     // fall through to default message
   }
-  return `Request failed with status ${response.status}`;
+  return { message: `Request failed with status ${response.status}` };
 }
 
 async function requestJson<T>(input: string, init: RequestInit = {}): Promise<T> {
@@ -76,7 +101,8 @@ async function requestJson<T>(input: string, init: RequestInit = {}): Promise<T>
     response = await send(await currentIdToken(true));
   }
   if (!response.ok) {
-    throw new AdminApiError(response.status, await readError(response));
+    const err = await readError(response);
+    throw new AdminApiError(response.status, err.message, undefined, err.code);
   }
   return (await response.json()) as T;
 }
@@ -234,7 +260,32 @@ export async function resendReceipt(
   }
 
   if (!response.ok) {
-    throw new AdminApiError(response.status, await readError(response));
+    const err = await readError(response);
+    throw new AdminApiError(response.status, err.message, undefined, err.code);
   }
   return (await response.json()) as ResendReceiptResponse;
+}
+
+export async function listAdmins(): Promise<ListAdminsResponse> {
+  const url = buildUrl("/api/admin/admins");
+  return requestJson<ListAdminsResponse>(url, { method: "GET" });
+}
+
+export async function addAdmin(input: AddAdminInput): Promise<AdminListItem> {
+  const url = buildUrl("/api/admin/admins");
+  return requestJson<AdminListItem>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function removeAdmin(
+  emailLower: string,
+): Promise<RemoveAdminResponse> {
+  if (!emailLower) throw new AdminApiError(400, "Missing email");
+  const url = buildUrl(
+    `/api/admin/admins/${encodeURIComponent(emailLower)}`,
+  );
+  return requestJson<RemoveAdminResponse>(url, { method: "DELETE" });
 }

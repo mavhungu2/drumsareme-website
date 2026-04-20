@@ -5,6 +5,8 @@
     "rewrites": [
       { "source": "/api/checkout", "function": "createCheckout" },
       { "source": "/api/yoco/webhook", "function": "yocoWebhook" },
+      { "source": "/api/admin/admins", "function": "adminUsers" },
+      { "source": "/api/admin/admins/**", "function": "adminUsers" },
       { "source": "/api/admin/orders", "function": "adminListOrders" },
       { "source": "/api/admin/orders/**", "function": "adminOrderActions" },
       { "source": "/api/orders/**", "function": "getOrder" }

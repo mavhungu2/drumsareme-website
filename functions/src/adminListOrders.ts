@@ -1,7 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 import { db, Timestamp, type Order } from "./lib/firestore";
-import { ADMIN_UIDS, requireAdmin } from "./lib/auth";
+import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 
 const VALID_STATUSES: ReadonlyArray<Order["status"]> = [
@@ -160,10 +160,11 @@ export const adminListOrders = onRequest(
 
     // Touch the param so it's discovered at deploy time even though we use
     // it only indirectly via requireAdmin. See firebase-functions v2 params.
-    void ADMIN_UIDS;
+    void ADMIN_EMAILS;
 
-    const uid = await requireAdmin(req, res);
-    if (!uid) return;
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const { uid } = auth;
 
     const parsed = parseQuery(
       req.query as Record<string, string | string[] | undefined>,

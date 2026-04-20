@@ -10,7 +10,7 @@ import {
   type OrderNote,
   type OrderTracking,
 } from "./lib/firestore";
-import { ADMIN_UIDS, requireAdmin } from "./lib/auth";
+import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 import {
   sendCancellationNotification,
@@ -539,10 +539,11 @@ export const adminOrderActions = onRequest(
       return;
     }
 
-    void ADMIN_UIDS;
+    void ADMIN_EMAILS;
 
-    const uid = await requireAdmin(req, res);
-    if (!uid) return;
+    const auth = await requireAdmin(req, res);
+    if (!auth) return;
+    const { uid } = auth;
 
     const parts = parsePath(req.path);
     const resolved = resolveRoute(parts, req.method);
