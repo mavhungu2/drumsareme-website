@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
+import { Loader2, Upload } from "lucide-react";
 import {
   AdminApiError,
   createProduct as apiCreateProduct,
   updateProduct as apiUpdateProduct,
+  uploadProductImage,
 } from "@/lib/admin/api-client";
 import type {
   CreateProductInput,
@@ -80,10 +82,51 @@ export default function ProductForm({
   const [state, setState] = useState<FormState>(() => toFormState(initial));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setState(toFormState(initial));
   }, [initial]);
+
+  const handleUpload = async (file: File) => {
+    const slug = state.slug.trim();
+    if (!slug) {
+      setError("Set the slug first — uploads are stored under it.");
+      return;
+    }
+    if (!SLUG_PATTERN.test(slug)) {
+      setError(
+        "Slug must be lowercase alphanumeric with single hyphens before uploading.",
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be 5MB or smaller.");
+      return;
+    }
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setError("Image must be JPEG, PNG, or WebP.");
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const result = await uploadProductImage(slug, file);
+      update("image", result.url);
+    } catch (err) {
+      const message =
+        err instanceof AdminApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Upload failed";
+      setError(message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const isCreate = initial === null;
 
@@ -272,20 +315,84 @@ export default function ProductForm({
             className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
         </label>
-        <label
-          htmlFor={imageId}
-          className="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2"
-        >
-          <span>Image path (relative to /public)</span>
-          <input
-            id={imageId}
-            type="text"
-            value={state.image}
-            onChange={(e) => update("image", e.target.value)}
-            placeholder="/images/gallery/IMG_7489.jpg"
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          />
-        </label>
+        <div className="flex flex-col gap-2 text-xs font-medium text-muted sm:col-span-2">
+          <label htmlFor={imageId}>
+            <span>Image (upload or paste a URL / /public path)</span>
+          </label>
+          <div className="flex flex-col sm:flex-row gap-3 items-start">
+            {state.image ? (
+              <div className="relative w-32 h-32 shrink-0 overflow-hidden rounded-lg border border-border bg-surface">
+                {/* Use unoptimized for external Storage URLs since next.config
+                    has images.unoptimized=true. */}
+                <Image
+                  src={state.image}
+                  alt="Preview"
+                  fill
+                  sizes="128px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex w-32 h-32 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted">
+                No image
+              </div>
+            )}
+            <div className="flex-1 flex flex-col gap-2 w-full">
+              <input
+                id={imageId}
+                type="text"
+                value={state.image}
+                onChange={(e) => update("image", e.target.value)}
+                placeholder="/images/gallery/IMG_7489.jpg or https://…"
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleUpload(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || submitting}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm hover:bg-surface disabled:opacity-60 transition-colors"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" aria-hidden />
+                      Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={14} aria-hidden />
+                      Upload image
+                    </>
+                  )}
+                </button>
+                {state.image && !uploading && (
+                  <button
+                    type="button"
+                    onClick={() => update("image", "")}
+                    className="text-xs text-muted hover:text-foreground transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted">
+                JPEG / PNG / WebP up to 5MB. Uploads are stored under the
+                product slug.
+              </p>
+            </div>
+          </div>
+        </div>
         <label
           htmlFor={descId}
           className="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2"

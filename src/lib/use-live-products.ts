@@ -9,6 +9,10 @@ import type { Product } from "./products";
 interface LiveOverlayEntry {
   price: number;
   inStock: boolean;
+  name?: string;
+  description?: string;
+  features?: string[];
+  image?: string;
 }
 
 type LiveOverlay = ReadonlyMap<string, LiveOverlayEntry>;
@@ -38,13 +42,36 @@ async function loadOverlay(): Promise<LiveOverlay> {
       const snap = await getDocs(collection(db, "products"));
       const map = new Map<string, LiveOverlayEntry>();
       snap.forEach((doc) => {
-        const data = doc.data() as { price?: unknown; inStock?: unknown };
+        const data = doc.data() as {
+          price?: unknown;
+          inStock?: unknown;
+          name?: unknown;
+          description?: unknown;
+          features?: unknown;
+          image?: unknown;
+        };
         const price =
           typeof data.price === "number" && Number.isFinite(data.price)
             ? data.price
             : undefined;
+        if (price === undefined) return;
         const inStock = data.inStock !== false;
-        if (price !== undefined) map.set(doc.id, { price, inStock });
+        const entry: LiveOverlayEntry = { price, inStock };
+        if (typeof data.name === "string" && data.name.length > 0) {
+          entry.name = data.name;
+        }
+        if (typeof data.description === "string") {
+          entry.description = data.description;
+        }
+        if (Array.isArray(data.features)) {
+          entry.features = data.features.filter(
+            (f): f is string => typeof f === "string",
+          );
+        }
+        if (typeof data.image === "string" && data.image.length > 0) {
+          entry.image = data.image;
+        }
+        map.set(doc.id, entry);
       });
       cached = map;
       return map;
@@ -75,30 +102,34 @@ export function useLiveOverlay(): LiveOverlay {
   return overlay;
 }
 
+function applyOverlay(
+  product: Product,
+  live: LiveOverlayEntry | undefined,
+): Product {
+  if (!live) return product;
+  return {
+    ...product,
+    price: live.price,
+    inStock: live.inStock,
+    name: live.name ?? product.name,
+    description: live.description ?? product.description,
+    features: live.features ?? product.features,
+    image: live.image ?? product.image,
+  };
+}
+
 export function useLiveProduct(product: Product): Product {
   const overlay = useLiveOverlay();
-  return useMemo(() => {
-    const live = overlay.get(product.id);
-    if (!live) return product;
-    if (live.price === product.price && live.inStock === product.inStock) {
-      return product;
-    }
-    return { ...product, price: live.price, inStock: live.inStock };
-  }, [overlay, product]);
+  return useMemo(
+    () => applyOverlay(product, overlay.get(product.id)),
+    [overlay, product],
+  );
 }
 
 export function useLiveProducts(items: ReadonlyArray<Product>): Product[] {
   const overlay = useLiveOverlay();
   return useMemo(
-    () =>
-      items.map((product) => {
-        const live = overlay.get(product.id);
-        if (!live) return product;
-        if (live.price === product.price && live.inStock === product.inStock) {
-          return product;
-        }
-        return { ...product, price: live.price, inStock: live.inStock };
-      }),
+    () => items.map((product) => applyOverlay(product, overlay.get(product.id))),
     [overlay, items],
   );
 }

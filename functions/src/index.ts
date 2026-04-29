@@ -9,3 +9,4 @@ export { adminExpenses } from "./adminExpenses";
 export { adminAnalytics } from "./adminAnalytics";
 export { adminManualSales } from "./adminManualSales";
 export { adminProducts } from "./adminProducts";
+export { adminUploadProductImage } from "./adminUploadProductImage";

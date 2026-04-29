@@ -422,3 +422,36 @@ export async function deleteProduct(
   const url = buildUrl(`/api/admin/products/${encodeURIComponent(id)}`);
   return requestJson<{ ok: true; id: string }>(url, { method: "DELETE" });
 }
+
+export interface ProductImageUploadResponse {
+  url: string;
+  path: string;
+}
+
+export async function uploadProductImage(
+  productId: string,
+  file: File,
+): Promise<ProductImageUploadResponse> {
+  if (!productId) throw new AdminApiError(400, "Missing productId");
+  const url = buildUrl("/api/admin/uploads/product-image");
+  const form = new FormData();
+  form.append("productId", productId);
+  form.append("file", file, file.name);
+
+  const send = async (token: string): Promise<Response> =>
+    fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      body: form,
+    });
+
+  let response = await send(await currentIdToken(false));
+  if (response.status === 401) {
+    response = await send(await currentIdToken(true));
+  }
+  if (!response.ok) {
+    const err = await readError(response);
+    throw new AdminApiError(response.status, err.message, undefined, err.code);
+  }
+  return (await response.json()) as ProductImageUploadResponse;
+}

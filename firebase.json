@@ -17,6 +17,7 @@
       { "source": "/api/admin/sales/manual", "function": "adminManualSales" },
       { "source": "/api/admin/products", "function": "adminProducts" },
       { "source": "/api/admin/products/**", "function": "adminProducts" },
+      { "source": "/api/admin/uploads/product-image", "function": "adminUploadProductImage" },
       { "source": "/api/orders/**", "function": "getOrder" }
     ],
     "headers": [

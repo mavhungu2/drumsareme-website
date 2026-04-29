@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   images: {
     unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "storage.googleapis.com" },
+    ],
   },
   turbopack: {
     root: __dirname,
