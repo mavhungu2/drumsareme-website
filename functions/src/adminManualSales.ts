@@ -225,6 +225,8 @@ async function createManualSale(
   const ref = await generateOrderRef();
   const orderDoc = db.collection("orders").doc();
 
+  // Firestore rejects explicit `undefined` field values — only include
+  // optional fields when set.
   const customer: Customer = {
     firstName: input.customer.firstName,
     lastName: input.customer.lastName,
@@ -234,7 +236,7 @@ async function createManualSale(
     city: "",
     province: "",
     postalCode: "",
-    notes: input.notes,
+    ...(input.notes ? { notes: input.notes } : {}),
   };
 
   await db.runTransaction(async (tx) => {

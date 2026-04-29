@@ -5,6 +5,12 @@ import Busboy from "busboy";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 
+// Firebase has migrated default bucket naming from
+// {projectId}.appspot.com to {projectId}.firebasestorage.app for newer
+// projects, and `getStorage().bucket()` without arguments resolves to the
+// legacy form which doesn't exist here. Pin the explicit bucket name.
+const BUCKET_NAME = "drumsareme-website.firebasestorage.app";
+
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -135,7 +141,7 @@ export const adminUploadProductImage = onRequest(
     try {
       const ext = pickExtension(parsed.mimeType, parsed.filename);
       const path = `product-images/${parsed.productId}/${Date.now()}.${ext}`;
-      const bucket = getStorage().bucket();
+      const bucket = getStorage().bucket(BUCKET_NAME);
       const file = bucket.file(path);
       await file.save(parsed.buffer, {
         contentType: parsed.mimeType,
