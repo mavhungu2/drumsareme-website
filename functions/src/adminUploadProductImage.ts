@@ -5,11 +5,11 @@ import Busboy from "busboy";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 
-// Firebase has migrated default bucket naming from
-// {projectId}.appspot.com to {projectId}.firebasestorage.app for newer
-// projects, and `getStorage().bucket()` without arguments resolves to the
-// legacy form which doesn't exist here. Pin the explicit bucket name.
-const BUCKET_NAME = "drumsareme-website.firebasestorage.app";
+// Dedicated uploads bucket (uniform access, allUsers:objectViewer) — created
+// outside Firebase Storage because Firebase Storage hasn't been provisioned
+// for this project. Public URLs follow the standard
+// https://storage.googleapis.com/{bucket}/{path} pattern.
+const BUCKET_NAME = "drumsareme-website-uploads";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -143,9 +143,11 @@ export const adminUploadProductImage = onRequest(
       const path = `product-images/${parsed.productId}/${Date.now()}.${ext}`;
       const bucket = getStorage().bucket(BUCKET_NAME);
       const file = bucket.file(path);
+      // Uniform bucket-level access disallows per-object ACLs, so don't pass
+      // `public: true`. Public read is granted at the bucket level via
+      // allUsers:objectViewer.
       await file.save(parsed.buffer, {
         contentType: parsed.mimeType,
-        public: true,
         metadata: {
           cacheControl: "public, max-age=31536000, immutable",
         },
