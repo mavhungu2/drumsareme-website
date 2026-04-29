@@ -9,7 +9,6 @@ export interface PaymentBreakdown {
 }
 
 export interface StatusBreakdown {
-  pending: number;
   paid: number;
   failed: number;
   shipped: number;

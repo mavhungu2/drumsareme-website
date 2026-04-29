@@ -20,7 +20,6 @@ interface PaymentBreakdown {
 }
 
 interface StatusBreakdown {
-  pending: number;
   paid: number;
   failed: number;
   shipped: number;
@@ -139,7 +138,6 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
 
   const payments: PaymentBreakdown = { cash: 0, card: 0, eft: 0, yoco: 0 };
   const statuses: StatusBreakdown = {
-    pending: 0,
     paid: 0,
     failed: 0,
     shipped: 0,
@@ -155,6 +153,10 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
 
   ordersSnap.forEach((doc) => {
     const order = doc.data() as Order;
+    // Pending orders are deliberately excluded from analytics — they have not
+    // generated revenue yet and skew counts. They remain visible on the orders
+    // list so admins can fulfil them.
+    if (order.status === "pending") return;
     totalOrders += 1;
     statuses[order.status] += 1;
 
