@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   AdminApiError,
   createManualSale,
 } from "@/lib/admin/api-client";
 import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
 import { products } from "@/lib/products";
+import { useLiveOverlay } from "@/lib/use-live-products";
 import { formatZar } from "@/lib/admin/format";
 
 interface LineRow {
@@ -45,6 +46,8 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const overlay = useLiveOverlay();
+
   const subtotal = useMemo(() => {
     return rows.reduce((sum, row) => {
       const product = products.find((p) => p.id === row.productId);
@@ -53,6 +56,43 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       return sum + product.price * qty;
     }, 0);
   }, [rows]);
+
+  // Sum requested qty per productId so the same SKU appearing on multiple
+  // rows is checked against the combined total (matches what the server
+  // does when it walks orderItems).
+  const requestedByProductId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      const qty = Number.parseInt(row.qty, 10);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      map.set(row.productId, (map.get(row.productId) ?? 0) + qty);
+    }
+    return map;
+  }, [rows]);
+
+  const stockIssues = useMemo(() => {
+    const issues: Array<{
+      productId: string;
+      name: string;
+      requested: number;
+      stock: number;
+    }> = [];
+    requestedByProductId.forEach((requested, productId) => {
+      const stock = overlay.get(productId)?.stock;
+      if (stock === undefined) return;
+      if (requested > stock) {
+        const product = products.find((p) => p.id === productId);
+        issues.push({
+          productId,
+          name: product?.name ?? productId,
+          requested,
+          stock,
+        });
+      }
+    });
+    return issues;
+  }, [overlay, requestedByProductId]);
+  const hasStockIssue = stockIssues.length > 0;
 
   const updateRow = (rowId: string, patch: Partial<LineRow>) => {
     setRows((prev) =>
@@ -90,6 +130,13 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         items.push({ productId: product.id, qty });
       }
 
+      if (stockIssues.length > 0) {
+        const first = stockIssues[0];
+        return setError(
+          `${first.name} only has ${first.stock} in stock — reduce the quantity or remove the line.`,
+        );
+      }
+
       setSubmitting(true);
       setError(null);
       try {
@@ -116,7 +163,16 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         setSubmitting(false);
       }
     },
-    [email, firstName, lastName, notes, onSubmitted, phone, rows],
+    [
+      email,
+      firstName,
+      lastName,
+      notes,
+      onSubmitted,
+      phone,
+      rows,
+      stockIssues,
+    ],
   );
 
   return (
@@ -209,10 +265,18 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               product && Number.isFinite(qty) && qty > 0
                 ? product.price * qty
                 : 0;
+            const stockForProduct = overlay.get(row.productId)?.stock;
+            const requestedForProduct =
+              requestedByProductId.get(row.productId) ?? 0;
+            const overSpec =
+              stockForProduct !== undefined &&
+              requestedForProduct > stockForProduct;
             return (
               <div
                 key={row.rowId}
-                className="grid grid-cols-12 gap-2 items-end"
+                className={`grid grid-cols-12 gap-2 items-end rounded-lg ${
+                  overSpec ? "bg-red-50/40 p-2 -mx-2" : ""
+                }`}
               >
                 <label className="col-span-12 sm:col-span-6 flex flex-col gap-1 text-xs font-medium text-muted">
                   <span>Product</span>
@@ -260,6 +324,26 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                     <Trash2 size={14} aria-hidden />
                   </button>
                 </div>
+                {stockForProduct !== undefined && (
+                  <p
+                    className={`col-span-12 text-xs ${
+                      overSpec
+                        ? "text-red-700 font-medium flex items-center gap-1.5"
+                        : stockForProduct <= 3
+                          ? "text-amber-700"
+                          : "text-muted"
+                    }`}
+                  >
+                    {overSpec && (
+                      <AlertTriangle size={12} aria-hidden />
+                    )}
+                    {overSpec
+                      ? `Only ${stockForProduct} in stock — requested ${requestedForProduct}`
+                      : stockForProduct <= 0
+                        ? "Sold out"
+                        : `${stockForProduct} in stock`}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -295,14 +379,17 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         </dl>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || hasStockIssue}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+          title={hasStockIssue ? "Resolve stock issues to save" : undefined}
         >
           {submitting ? (
             <>
               <Loader2 size={14} className="animate-spin" aria-hidden />
               Saving…
             </>
+          ) : hasStockIssue ? (
+            "Resolve stock issues"
           ) : (
             "Save as pending"
           )}

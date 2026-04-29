@@ -6,11 +6,13 @@ import {
   FieldValue,
   generateOrderRef,
   type Customer,
+  type InventoryItem,
   type Order,
   type OrderItem,
 } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
+import { InsufficientStockError } from "./lib/errors";
 import { getServerProduct } from "./lib/products";
 
 const MAX_NAME_LEN = 120;
@@ -192,6 +194,32 @@ async function createManualSale(
     subtotal += lineTotal;
   }
 
+  // Reject up front if any tracked SKU has insufficient stock. Untracked
+  // SKUs (no inventory doc) pass through. The Mark as Paid transaction
+  // re-checks atomically — this is just an early sanity gate so the admin
+  // doesn't create a pending sale for a stick we can't fulfil.
+  const inventoryRefs = orderItems.map((item) => ({
+    productId: item.productId,
+    qty: item.qty,
+    name: item.name,
+    ref: db.collection("inventory").doc(item.productId),
+  }));
+  const inventorySnaps = await Promise.all(
+    inventoryRefs.map(({ ref }) => ref.get()),
+  );
+  for (let i = 0; i < inventoryRefs.length; i += 1) {
+    const snap = inventorySnaps[i];
+    if (!snap.exists) continue;
+    const data = snap.data() as InventoryItem;
+    const available = Math.max(
+      0,
+      (data.openingStock ?? 0) - (data.unitsSold ?? 0),
+    );
+    if (inventoryRefs[i].qty > available) {
+      throw new InsufficientStockError(inventoryRefs[i].name, available);
+    }
+  }
+
   const ref = await generateOrderRef();
   const orderDoc = db.collection("orders").doc();
 
@@ -264,6 +292,21 @@ export const adminManualSales = onRequest(
     try {
       await createManualSale(req, res, auth);
     } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        logger.info("adminManualSales rejected — insufficient stock", {
+          uid: auth.uid,
+          product: err.productName,
+          available: err.available,
+        });
+        if (!res.headersSent) {
+          res.status(409).json({
+            error: err.message,
+            available: err.available,
+            productName: err.productName,
+          });
+        }
+        return;
+      }
       logger.error("adminManualSales failed", {
         uid: auth.uid,
         err: String(err),
