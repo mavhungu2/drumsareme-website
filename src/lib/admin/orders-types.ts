@@ -12,6 +12,17 @@ export type OrderStatus =
   | "shipped"
   | "cancelled";
 
+export type OrderSource = "yoco" | "manual";
+export type ManualPaymentMethod = "cash" | "card" | "eft";
+
+export const MANUAL_PAYMENT_METHOD_LABEL: Readonly<
+  Record<ManualPaymentMethod, string>
+> = {
+  cash: "Cash",
+  card: "Card",
+  eft: "EFT",
+};
+
 export interface OrderItem {
   productId: string;
   name: string;
@@ -49,6 +60,9 @@ export interface Order {
   id: string;
   ref: string;
   status: OrderStatus;
+  source?: OrderSource;
+  manualPaymentMethod?: ManualPaymentMethod;
+  inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;
   shipping: number;

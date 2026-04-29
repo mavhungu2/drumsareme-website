@@ -4,11 +4,17 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  LayoutDashboard,
   Loader2,
   LogOut,
+  Package,
+  PlusCircle,
+  Receipt,
   ShoppingBag,
+  TrendingUp,
   User as UserIcon,
   Users,
+  Users2,
 } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import SignInGate from "./SignInGate";
@@ -22,10 +28,48 @@ interface NavItem {
 
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   {
+    href: "/admin/",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    match: (pathname) => pathname === "/admin" || pathname === "/admin/",
+  },
+  {
     href: "/admin/orders/",
     label: "Orders",
     icon: ShoppingBag,
-    match: (pathname) => pathname.startsWith("/admin/orders"),
+    match: (pathname) =>
+      pathname.startsWith("/admin/orders") &&
+      !pathname.startsWith("/admin/orders/manual"),
+  },
+  {
+    href: "/admin/orders/manual/",
+    label: "Manual sale",
+    icon: PlusCircle,
+    match: (pathname) => pathname.startsWith("/admin/orders/manual"),
+  },
+  {
+    href: "/admin/inventory/",
+    label: "Inventory",
+    icon: Package,
+    match: (pathname) => pathname.startsWith("/admin/inventory"),
+  },
+  {
+    href: "/admin/customers/",
+    label: "Customers",
+    icon: Users2,
+    match: (pathname) => pathname.startsWith("/admin/customers"),
+  },
+  {
+    href: "/admin/expenses/",
+    label: "Expenses",
+    icon: Receipt,
+    match: (pathname) => pathname.startsWith("/admin/expenses"),
+  },
+  {
+    href: "/admin/reports/",
+    label: "Reports",
+    icon: TrendingUp,
+    match: (pathname) => pathname.startsWith("/admin/reports"),
   },
   {
     href: "/admin/users/",

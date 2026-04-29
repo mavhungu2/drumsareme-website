@@ -39,9 +39,15 @@ export interface OrderTracking {
   url?: string;
 }
 
+export type OrderSource = "yoco" | "manual";
+export type ManualPaymentMethod = "cash" | "card" | "eft";
+
 export interface Order {
   ref: string;
   status: "pending" | "paid" | "failed" | "shipped" | "cancelled";
+  source?: OrderSource;
+  manualPaymentMethod?: ManualPaymentMethod;
+  inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;
   shipping: number;
@@ -59,6 +65,33 @@ export interface Order {
   receiptResendAt?: FirebaseFirestore.Timestamp;
   tracking?: OrderTracking;
   notes?: OrderNote[];
+}
+
+export interface InventoryItem {
+  productId: string;
+  name: string;
+  openingStock: number;
+  unitsSold: number;
+  currentStock: number;
+  reorderLevel: number;
+  supplier?: string;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export type ExpenseType =
+  | "materials"
+  | "shipping"
+  | "marketing"
+  | "operations"
+  | "other";
+
+export interface Expense {
+  date: FirebaseFirestore.Timestamp;
+  type: ExpenseType;
+  description: string;
+  amount: number;
+  createdAt: FirebaseFirestore.Timestamp;
+  createdBy: string;
 }
 
 export async function generateOrderRef(): Promise<string> {

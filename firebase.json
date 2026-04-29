@@ -9,6 +9,12 @@
       { "source": "/api/admin/admins/**", "function": "adminUsers" },
       { "source": "/api/admin/orders", "function": "adminListOrders" },
       { "source": "/api/admin/orders/**", "function": "adminOrderActions" },
+      { "source": "/api/admin/inventory", "function": "adminInventory" },
+      { "source": "/api/admin/inventory/**", "function": "adminInventory" },
+      { "source": "/api/admin/expenses", "function": "adminExpenses" },
+      { "source": "/api/admin/expenses/**", "function": "adminExpenses" },
+      { "source": "/api/admin/analytics", "function": "adminAnalytics" },
+      { "source": "/api/admin/sales/manual", "function": "adminManualSales" },
       { "source": "/api/orders/**", "function": "getOrder" }
     ],
     "headers": [

@@ -13,6 +13,23 @@ import type {
   OrderNote,
   OrderTracking,
 } from "./orders-types";
+import type {
+  InventoryListItem,
+  ListInventoryResponse,
+  UpsertInventoryInput,
+} from "./inventory-types";
+import type {
+  CreateExpenseInput,
+  ExpenseListItem,
+  ListExpensesQuery,
+  ListExpensesResponse,
+} from "./expenses-types";
+import type {
+  AnalyticsQuery,
+  AnalyticsResponse,
+  ManualSaleInput,
+  ManualSaleResponse,
+} from "./analytics-types";
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -288,4 +305,77 @@ export async function removeAdmin(
     `/api/admin/admins/${encodeURIComponent(emailLower)}`,
   );
   return requestJson<RemoveAdminResponse>(url, { method: "DELETE" });
+}
+
+export async function listInventory(): Promise<ListInventoryResponse> {
+  const url = buildUrl("/api/admin/inventory");
+  return requestJson<ListInventoryResponse>(url, { method: "GET" });
+}
+
+export async function upsertInventory(
+  input: UpsertInventoryInput,
+): Promise<InventoryListItem> {
+  const url = buildUrl(
+    `/api/admin/inventory/${encodeURIComponent(input.productId)}`,
+  );
+  return requestJson<InventoryListItem>(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      openingStock: input.openingStock,
+      reorderLevel: input.reorderLevel,
+      supplier: input.supplier,
+    }),
+  });
+}
+
+export async function listExpenses(
+  params: ListExpensesQuery = {},
+): Promise<ListExpensesResponse> {
+  const url = buildUrl("/api/admin/expenses", {
+    from: params.from,
+    to: params.to,
+    limit: params.limit,
+  });
+  return requestJson<ListExpensesResponse>(url, { method: "GET" });
+}
+
+export async function createExpense(
+  input: CreateExpenseInput,
+): Promise<ExpenseListItem> {
+  const url = buildUrl("/api/admin/expenses");
+  return requestJson<ExpenseListItem>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteExpense(
+  id: string,
+): Promise<{ ok: true; id: string }> {
+  if (!id) throw new AdminApiError(400, "Missing expense id");
+  const url = buildUrl(`/api/admin/expenses/${encodeURIComponent(id)}`);
+  return requestJson<{ ok: true; id: string }>(url, { method: "DELETE" });
+}
+
+export async function getAnalytics(
+  params: AnalyticsQuery = {},
+): Promise<AnalyticsResponse> {
+  const url = buildUrl("/api/admin/analytics", {
+    from: params.from,
+    to: params.to,
+  });
+  return requestJson<AnalyticsResponse>(url, { method: "GET" });
+}
+
+export async function createManualSale(
+  input: ManualSaleInput,
+): Promise<ManualSaleResponse> {
+  const url = buildUrl("/api/admin/sales/manual");
+  return requestJson<ManualSaleResponse>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }

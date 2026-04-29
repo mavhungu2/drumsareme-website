@@ -6,6 +6,7 @@ import {
   db,
   FieldValue,
   Timestamp,
+  type InventoryItem,
   type Order,
   type OrderNote,
   type OrderTracking,
@@ -363,10 +364,44 @@ const adminCancelOrder: Handler = async ({ req, res, uid, orderId }) => {
     body: `Order cancelled: ${reason}`,
   };
 
-  await orderRef.update({
-    status: "cancelled",
-    cancelledAt: FieldValue.serverTimestamp(),
-    notes: FieldValue.arrayUnion(cancellationNote),
+  // Credit inventory back if this order had decremented stock. Run atomically
+  // so concurrent cancel attempts cannot double-credit. Inventory is only
+  // applied for paid/shipped orders (via webhook or manual sale).
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(orderRef);
+    if (!fresh.exists) return;
+    const current = fresh.data() as Order;
+    if (current.status === "cancelled") return;
+    const shouldCredit = current.inventoryApplied === true;
+
+    if (shouldCredit) {
+      const inventoryRefs = (current.items ?? []).map((item) => ({
+        ref: db.collection("inventory").doc(item.productId),
+        qty: item.qty,
+      }));
+      const inventorySnaps = await Promise.all(
+        inventoryRefs.map(({ ref }) => tx.get(ref)),
+      );
+      inventorySnaps.forEach((snap, i) => {
+        if (!snap.exists) return;
+        const item = snap.data() as InventoryItem;
+        const { ref: invRef, qty } = inventoryRefs[i];
+        const nextSold = Math.max(0, (item.unitsSold ?? 0) - qty);
+        const nextStock = Math.max(0, item.openingStock - nextSold);
+        tx.update(invRef, {
+          unitsSold: nextSold,
+          currentStock: nextStock,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    }
+
+    tx.update(orderRef, {
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+      inventoryApplied: shouldCredit ? false : current.inventoryApplied ?? false,
+      notes: FieldValue.arrayUnion(cancellationNote),
+    });
   });
 
   if (notifyCustomer) {

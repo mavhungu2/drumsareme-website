@@ -4,3 +4,7 @@ export { getOrder } from "./getOrder";
 export { adminListOrders } from "./adminListOrders";
 export { adminOrderActions } from "./adminOrderActions";
 export { adminUsers } from "./adminUsers";
+export { adminInventory } from "./adminInventory";
+export { adminExpenses } from "./adminExpenses";
+export { adminAnalytics } from "./adminAnalytics";
+export { adminManualSales } from "./adminManualSales";

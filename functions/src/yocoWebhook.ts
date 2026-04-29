@@ -1,7 +1,12 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logger } from "firebase-functions";
-import { db, FieldValue, type Order } from "./lib/firestore";
+import {
+  db,
+  FieldValue,
+  type InventoryItem,
+  type Order,
+} from "./lib/firestore";
 import { verifyYocoSignature } from "./lib/yoco";
 import { sendCustomerReceipt, sendMerchantNotification } from "./lib/resend";
 
@@ -78,10 +83,54 @@ export const yocoWebhook = onRequest(
         res.status(200).send("Already paid");
         return;
       }
-      await orderRef.update({
-        status: "paid",
-        paidAt: FieldValue.serverTimestamp(),
-        "yoco.paymentId": event.payload?.id ?? null,
+      // Atomically flip status to paid AND decrement inventory. Re-read inside
+      // the transaction so concurrent webhook deliveries (Yoco retries) cannot
+      // double-apply the stock decrement.
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(orderRef);
+        if (!fresh.exists) return;
+        const current = fresh.data() as Order;
+        if (current.status === "paid" || current.inventoryApplied === true) {
+          return;
+        }
+        const inventoryRefs = (current.items ?? []).map((item) => ({
+          ref: db.collection("inventory").doc(item.productId),
+          qty: item.qty,
+          name: item.name,
+        }));
+        const inventorySnaps = await Promise.all(
+          inventoryRefs.map(({ ref }) => tx.get(ref)),
+        );
+        inventorySnaps.forEach((snap, i) => {
+          const { ref: invRef, qty, name } = inventoryRefs[i];
+          if (snap.exists) {
+            const item = snap.data() as InventoryItem;
+            const nextSold = (item.unitsSold ?? 0) + qty;
+            const nextStock = Math.max(0, item.openingStock - nextSold);
+            tx.update(invRef, {
+              unitsSold: nextSold,
+              currentStock: nextStock,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          } else {
+            tx.set(invRef, {
+              productId: invRef.id,
+              name,
+              openingStock: 0,
+              unitsSold: qty,
+              currentStock: 0,
+              reorderLevel: 0,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          }
+        });
+        tx.update(orderRef, {
+          status: "paid",
+          source: current.source ?? "yoco",
+          inventoryApplied: true,
+          paidAt: FieldValue.serverTimestamp(),
+          "yoco.paymentId": event.payload?.id ?? null,
+        });
       });
       const paidOrder: Order = { ...order, status: "paid" };
       try {
