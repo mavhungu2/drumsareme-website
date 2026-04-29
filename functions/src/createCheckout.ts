@@ -7,6 +7,7 @@ import {
   generateOrderRef,
   type Customer,
   type Fulfilment,
+  type InventoryItem,
   type OrderItem,
 } from "./lib/firestore";
 import {
@@ -128,6 +129,37 @@ export const createCheckout = onRequest(
         lineTotal,
       });
       subtotal += lineTotal;
+    }
+
+    // Prevent overselling: reject if any item exceeds current stock. Inventory
+    // is decremented at payment time, but this is the earliest point we can
+    // refuse — saves the customer a trip through Yoco for a stick we can't
+    // ship. There's still a tiny race window between this read and the
+    // webhook decrement; the webhook itself is the authoritative gate.
+    const inventoryRefs = items.map((item) => ({
+      productId: item.productId,
+      qty: item.qty,
+      ref: db.collection("inventory").doc(item.productId),
+    }));
+    const inventorySnaps = await Promise.all(
+      inventoryRefs.map(({ ref }) => ref.get()),
+    );
+    for (let i = 0; i < inventoryRefs.length; i += 1) {
+      const snap = inventorySnaps[i];
+      if (!snap.exists) continue; // Untracked product — allow through.
+      const data = snap.data() as InventoryItem;
+      const available = Math.max(
+        0,
+        (data.openingStock ?? 0) - (data.unitsSold ?? 0),
+      );
+      if (inventoryRefs[i].qty > available) {
+        res.status(409).json({
+          error: `Only ${available} of ${items[i].name} in stock`,
+          productId: inventoryRefs[i].productId,
+          available,
+        });
+        return;
+      }
     }
 
     const fulfilment: Fulfilment = validated.fulfilment ?? "delivery";

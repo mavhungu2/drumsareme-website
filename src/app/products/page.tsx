@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { Check, ShoppingCart } from "lucide-react";
 import { products, sizes, colors, type Product } from "@/lib/products";
-import { useLiveProducts, useStock } from "@/lib/use-live-products";
+import { useLiveProducts, useLiveOverlay, useStock } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
+
+const LOW_STOCK_THRESHOLD = 12;
 
 function StockBadge({ productId }: { productId: string }) {
   const stock = useStock(productId);
@@ -16,32 +18,33 @@ function StockBadge({ productId }: { productId: string }) {
       <span className="text-xs font-medium text-red-700">Sold out</span>
     );
   }
-  if (stock <= 3) {
-    return (
-      <span className="text-xs font-medium text-amber-700">
-        Only {stock} left
-      </span>
-    );
+  if (stock < LOW_STOCK_THRESHOLD) {
+    const className =
+      stock <= 3
+        ? "text-xs font-medium text-amber-700"
+        : "text-xs text-muted";
+    return <span className={className}>Only {stock} left</span>;
   }
-  return (
-    <span className="text-xs text-muted">{stock} in stock</span>
-  );
+  return null;
 }
 
 export default function ProductsPage() {
-  const { addItem } = useCart();
+  const { addItem, items: cartItems } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
   const live = useLiveProducts(products);
+  const overlay = useLiveOverlay();
 
-  const quickAdd = (product: Product) => (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addItem(product, 1);
-    setAddedId(product.id);
-    setTimeout(() => {
-      setAddedId((prev) => (prev === product.id ? null : prev));
-    }, 1500);
-  };
+  const quickAdd = (product: Product, soldOut: boolean, capReached: boolean) =>
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (soldOut || capReached) return;
+      addItem(product, 1);
+      setAddedId(product.id);
+      setTimeout(() => {
+        setAddedId((prev) => (prev === product.id ? null : prev));
+      }, 1500);
+    };
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
@@ -147,6 +150,13 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {filtered.map((product) => {
               const justAdded = addedId === product.id;
+              const stock = overlay.get(product.id)?.stock;
+              const soldOut = stock !== undefined && stock <= 0;
+              const inCart =
+                cartItems.find((i) => i.product.id === product.id)?.quantity ??
+                0;
+              const capReached = stock !== undefined && inCart >= stock;
+              const disabled = soldOut || capReached;
               return (
                 <Link
                   key={product.id}
@@ -170,12 +180,21 @@ export default function ProductsPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={quickAdd(product)}
-                      aria-label={`Add ${product.name} to cart`}
-                      className={`absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground motion-safe:opacity-0 motion-safe:translate-y-1 motion-safe:group-hover:opacity-100 motion-safe:group-hover:translate-y-0 motion-safe:group-focus-within:opacity-100 ${
+                      onClick={quickAdd(product, soldOut, capReached)}
+                      disabled={disabled}
+                      aria-label={
+                        soldOut
+                          ? `${product.name} sold out`
+                          : capReached
+                            ? `${product.name} — all available stock in cart`
+                            : `Add ${product.name} to cart`
+                      }
+                      className={`absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground motion-safe:opacity-0 motion-safe:translate-y-1 motion-safe:group-hover:opacity-100 motion-safe:group-hover:translate-y-0 motion-safe:group-focus-within:opacity-100 disabled:cursor-not-allowed ${
                         justAdded
                           ? "bg-green text-white"
-                          : "bg-white text-foreground hover:bg-foreground hover:text-white"
+                          : disabled
+                            ? "bg-gray-300 text-gray-500"
+                            : "bg-white text-foreground hover:bg-foreground hover:text-white"
                       }`}
                     >
                       {justAdded ? (

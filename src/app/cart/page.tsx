@@ -2,15 +2,29 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ShoppingCart, ArrowRight, Lock } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Lock,
+  Minus,
+  Plus,
+  ShoppingCart,
+  Trash2,
+} from "lucide-react";
 import { useCart } from "@/lib/cart-context";
+import { useLiveOverlay } from "@/lib/use-live-products";
 import { SHIPPING_FLAT_ZAR } from "@/lib/products";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, totalPrice } =
     useCart();
+  const overlay = useLiveOverlay();
   const shipping = items.length > 0 ? SHIPPING_FLAT_ZAR : 0;
   const total = totalPrice + shipping;
+  const hasOverstock = items.some((item) => {
+    const stock = overlay.get(item.product.id)?.stock;
+    return stock !== undefined && item.quantity > stock;
+  });
 
   if (items.length === 0) {
     return (
@@ -48,10 +62,18 @@ export default function CartPage() {
           <div className="grid lg:grid-cols-3 gap-10 lg:gap-16">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {items.map((item) => (
+              {items.map((item) => {
+                const stock = overlay.get(item.product.id)?.stock;
+                const overLimit =
+                  stock !== undefined && item.quantity > stock;
+                const atLimit =
+                  stock !== undefined && item.quantity >= stock;
+                return (
                 <div
                   key={item.product.id}
-                  className="flex gap-4 sm:gap-6 border border-border rounded-2xl p-4 sm:p-5"
+                  className={`flex gap-4 sm:gap-6 border rounded-2xl p-4 sm:p-5 ${
+                    overLimit ? "border-red-200 bg-red-50/40" : "border-border"
+                  }`}
                 >
                   <Link
                     href={`/products/${item.product.slug}`}
@@ -110,7 +132,8 @@ export default function CartPage() {
                               item.quantity + 1
                             )
                           }
-                          className="p-1.5 sm:p-2 text-muted hover:text-foreground transition-colors"
+                          disabled={atLimit}
+                          className="p-1.5 sm:p-2 text-muted hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           aria-label="Increase"
                         >
                           <Plus size={14} />
@@ -120,9 +143,31 @@ export default function CartPage() {
                         R{(item.product.price * item.quantity).toLocaleString("en-ZA")}
                       </p>
                     </div>
+                    {overLimit && stock !== undefined && (
+                      <div className="mt-3 flex items-start gap-2 text-xs text-red-700">
+                        <AlertTriangle
+                          size={14}
+                          className="mt-0.5 shrink-0"
+                          aria-hidden
+                        />
+                        <span>
+                          Only {stock} in stock —{" "}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateQuantity(item.product.id, stock)
+                            }
+                            className="underline font-medium hover:text-red-900"
+                          >
+                            reduce to {stock}
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               <button
                 onClick={clearCart}
@@ -170,13 +215,23 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Link
-                  href="/checkout"
-                  className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors mb-3"
-                >
-                  <Lock size={14} />
-                  Checkout
-                </Link>
+                {hasOverstock ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full inline-flex items-center justify-center gap-2 bg-gray-300 text-gray-600 px-8 py-3.5 rounded-full text-sm font-semibold cursor-not-allowed mb-3"
+                  >
+                    Resolve stock issues to checkout
+                  </button>
+                ) : (
+                  <Link
+                    href="/checkout"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white px-8 py-3.5 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors mb-3"
+                  >
+                    <Lock size={14} />
+                    Checkout
+                  </Link>
+                )}
 
                 <Link
                   href="/products"

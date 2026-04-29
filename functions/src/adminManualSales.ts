@@ -21,6 +21,17 @@ const VALID_PAYMENTS: ReadonlyArray<ManualPaymentMethod> = [
   "card",
   "eft",
 ];
+
+class InsufficientStockError extends Error {
+  readonly productName: string;
+  readonly available: number;
+  constructor(productName: string, available: number) {
+    super(`Only ${available} of ${productName} in stock`);
+    this.name = "InsufficientStockError";
+    this.productName = productName;
+    this.available = available;
+  }
+}
 const MAX_NAME_LEN = 120;
 const MAX_PHONE_LEN = 30;
 const MAX_NOTES_LEN = 500;
@@ -279,6 +290,24 @@ async function createManualSale(
       inventoryRefs.map(({ ref }) => tx.get(ref)),
     );
 
+    // Reject the sale if any tracked SKU has insufficient stock. Untracked
+    // products fall through to the create-on-demand branch below.
+    for (let i = 0; i < inventorySnaps.length; i += 1) {
+      const snap = inventorySnaps[i];
+      if (!snap.exists) continue;
+      const item = snap.data() as InventoryItem;
+      const available = Math.max(
+        0,
+        (item.openingStock ?? 0) - (item.unitsSold ?? 0),
+      );
+      if (inventoryRefs[i].qty > available) {
+        throw new InsufficientStockError(
+          inventoryRefs[i].name,
+          available,
+        );
+      }
+    }
+
     inventorySnaps.forEach((snap, i) => {
       const { ref: invRef, qty, name } = inventoryRefs[i];
       if (snap.exists) {
@@ -361,6 +390,20 @@ export const adminManualSales = onRequest(
     try {
       await createManualSale(req, res, auth);
     } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        logger.info("adminManualSales rejected — insufficient stock", {
+          uid: auth.uid,
+          product: err.productName,
+          available: err.available,
+        });
+        if (!res.headersSent) {
+          res.status(409).json({
+            error: err.message,
+            available: err.available,
+          });
+        }
+        return;
+      }
       logger.error("adminManualSales failed", {
         uid: auth.uid,
         err: String(err),
