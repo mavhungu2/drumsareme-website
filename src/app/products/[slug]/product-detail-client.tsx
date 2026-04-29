@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { ArrowLeft, Minus, Plus, ShoppingCart, Check } from "lucide-react";
-import { products, getProduct } from "@/lib/products";
+import { products, getProduct, type Product } from "@/lib/products";
 import { useLiveProduct } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
 
@@ -14,6 +14,17 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [quickAddedId, setQuickAddedId] = useState<string | null>(null);
+
+  const quickAdd = (item: Product) => (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem(item, 1);
+    setQuickAddedId(item.id);
+    setTimeout(() => {
+      setQuickAddedId((prev) => (prev === item.id ? null : prev));
+    }, 1500);
+  };
 
   if (!baked) {
     return (
@@ -150,24 +161,43 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               Also available in {product.size}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-              {sameSize.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/products/${p.slug}`}
-                  className="group"
-                >
-                  <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-3">
-                    <Image
-                      src={p.image}
-                      alt={p.name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  <h3 className="font-medium text-sm">{p.name}</h3>
-                  <p className="text-sm text-muted">R{p.price}</p>
-                </Link>
-              ))}
+              {sameSize.map((p) => {
+                const justAdded = quickAddedId === p.id;
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/products/${p.slug}`}
+                    className="group"
+                  >
+                    <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-3">
+                      <Image
+                        src={p.image}
+                        alt={p.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={quickAdd(p)}
+                        aria-label={`Add ${p.name} to cart`}
+                        className={`absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground motion-safe:opacity-0 motion-safe:translate-y-1 motion-safe:group-hover:opacity-100 motion-safe:group-hover:translate-y-0 motion-safe:group-focus-within:opacity-100 ${
+                          justAdded
+                            ? "bg-green text-white"
+                            : "bg-white text-foreground hover:bg-foreground hover:text-white"
+                        }`}
+                      >
+                        {justAdded ? (
+                          <Check size={16} aria-hidden />
+                        ) : (
+                          <ShoppingCart size={16} aria-hidden />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className="font-medium text-sm">{p.name}</h3>
+                    <p className="text-sm text-muted">R{p.price}</p>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

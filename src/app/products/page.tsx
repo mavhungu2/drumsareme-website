@@ -2,12 +2,26 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { products, sizes, colors } from "@/lib/products";
+import { useState, type MouseEvent } from "react";
+import { Check, ShoppingCart } from "lucide-react";
+import { products, sizes, colors, type Product } from "@/lib/products";
 import { useLiveProducts } from "@/lib/use-live-products";
+import { useCart } from "@/lib/cart-context";
 
 export default function ProductsPage() {
+  const { addItem } = useCart();
+  const [addedId, setAddedId] = useState<string | null>(null);
   const live = useLiveProducts(products);
+
+  const quickAdd = (product: Product) => (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem(product, 1);
+    setAddedId(product.id);
+    setTimeout(() => {
+      setAddedId((prev) => (prev === product.id ? null : prev));
+    }, 1500);
+  };
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
@@ -111,34 +125,53 @@ export default function ProductsPage() {
 
           {/* Product Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {filtered.map((product) => (
-              <Link
-                key={product.id}
-                href={`/products/${product.slug}`}
-                className="group"
-              >
-                <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-4">
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute top-3 left-3 flex gap-1.5">
-                    <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full">
-                      {product.size}
-                    </span>
-                    <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-medium px-2.5 py-1 rounded-full text-muted">
-                      {product.color}
-                    </span>
+            {filtered.map((product) => {
+              const justAdded = addedId === product.id;
+              return (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.slug}`}
+                  className="group"
+                >
+                  <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-4">
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute top-3 left-3 flex gap-1.5">
+                      <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full">
+                        {product.size}
+                      </span>
+                      <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-medium px-2.5 py-1 rounded-full text-muted">
+                        {product.color}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={quickAdd(product)}
+                      aria-label={`Add ${product.name} to cart`}
+                      className={`absolute bottom-3 right-3 inline-flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground motion-safe:opacity-0 motion-safe:translate-y-1 motion-safe:group-hover:opacity-100 motion-safe:group-hover:translate-y-0 motion-safe:group-focus-within:opacity-100 ${
+                        justAdded
+                          ? "bg-green text-white"
+                          : "bg-white text-foreground hover:bg-foreground hover:text-white"
+                      }`}
+                    >
+                      {justAdded ? (
+                        <Check size={16} aria-hidden />
+                      ) : (
+                        <ShoppingCart size={16} aria-hidden />
+                      )}
+                    </button>
                   </div>
-                </div>
-                <h3 className="font-semibold text-sm sm:text-base">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-muted">R{product.price}</p>
-              </Link>
-            ))}
+                  <h3 className="font-semibold text-sm sm:text-base">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm text-muted">R{product.price}</p>
+                </Link>
+              );
+            })}
           </div>
 
           {filtered.length === 0 && (
