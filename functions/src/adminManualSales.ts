@@ -6,6 +6,7 @@ import {
   FieldValue,
   generateOrderRef,
   type Customer,
+  type Fulfilment,
   type InventoryItem,
   type ManualPaymentMethod,
   type Order,
@@ -38,6 +39,7 @@ interface ManualSaleInput {
   };
   items: ManualSaleItemInput[];
   paymentMethod: ManualPaymentMethod;
+  fulfilment: Fulfilment;
   deliveryFee: number;
   notes?: string;
 }
@@ -84,9 +86,25 @@ function trimRequiredString(
 function validate(
   body: Record<string, unknown>,
 ): { ok: true; input: ManualSaleInput } | { ok: false; error: string } {
-  const { customer, items, paymentMethod, deliveryFee, notes, ...extra } = body;
+  const {
+    customer,
+    items,
+    paymentMethod,
+    fulfilment: rawFulfilment,
+    deliveryFee,
+    notes,
+    ...extra
+  } = body;
   if (Object.keys(extra).length > 0) {
     return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+
+  let fulfilment: Fulfilment = "delivery";
+  if (rawFulfilment !== undefined) {
+    if (rawFulfilment !== "delivery" && rawFulfilment !== "collection") {
+      return { ok: false, error: "fulfilment must be 'delivery' or 'collection'" };
+    }
+    fulfilment = rawFulfilment;
   }
 
   if (!customer || typeof customer !== "object") {
@@ -148,12 +166,23 @@ function validate(
     };
   }
 
-  if (
-    typeof deliveryFee !== "number" ||
-    !Number.isFinite(deliveryFee) ||
-    deliveryFee < 0
-  ) {
-    return { ok: false, error: "deliveryFee must be a non-negative number" };
+  // Tolerate a missing or zero deliveryFee for collection orders.
+  let deliveryFeeClean = 0;
+  if (deliveryFee !== undefined) {
+    if (
+      typeof deliveryFee !== "number" ||
+      !Number.isFinite(deliveryFee) ||
+      deliveryFee < 0
+    ) {
+      return { ok: false, error: "deliveryFee must be a non-negative number" };
+    }
+    deliveryFeeClean = deliveryFee;
+  }
+  if (fulfilment === "collection" && deliveryFeeClean > 0) {
+    return {
+      ok: false,
+      error: "deliveryFee must be 0 for collection orders",
+    };
   }
 
   let notesClean: string | undefined;
@@ -179,7 +208,8 @@ function validate(
       },
       items: cleanItems,
       paymentMethod: paymentMethod as ManualPaymentMethod,
-      deliveryFee: Math.round(deliveryFee * 100) / 100,
+      fulfilment,
+      deliveryFee: Math.round(deliveryFeeClean * 100) / 100,
       notes: notesClean,
     },
   };
@@ -278,6 +308,7 @@ async function createManualSale(
       status: "paid",
       source: "manual",
       manualPaymentMethod: input.paymentMethod,
+      fulfilment: input.fulfilment,
       inventoryApplied: true,
       items: orderItems,
       subtotal,

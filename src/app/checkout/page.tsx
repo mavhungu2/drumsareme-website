@@ -3,9 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, MapPin, Truck } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { SHIPPING_FLAT_ZAR } from "@/lib/products";
+
+type Fulfilment = "delivery" | "collection";
+
+const COLLECTION_ADDRESS = {
+  name: "Spring Glade",
+  line1: "Vermooten Rd",
+  suburb: "Princess",
+  city: "Roodepoort",
+  postalCode: "1724",
+} as const;
 
 const provinces = [
   { value: "GP", label: "Gauteng" },
@@ -51,11 +61,13 @@ const inputClass =
 export default function CheckoutPage() {
   const { items, totalPrice } = useCart();
   const [customer, setCustomer] = useState<Customer>(emptyCustomer);
+  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const subtotal = totalPrice;
-  const shipping = items.length > 0 ? SHIPPING_FLAT_ZAR : 0;
+  const shipping =
+    fulfilment === "collection" || items.length === 0 ? 0 : SHIPPING_FLAT_ZAR;
   const total = subtotal + shipping;
 
   if (items.length === 0) {
@@ -82,12 +94,27 @@ export default function CheckoutPage() {
     setError(null);
     setSubmitting(true);
     try {
+      // For collection orders, the customer's address fields are optional —
+      // ship a blanked payload so server validation doesn't reject empty
+      // address inputs the user never saw.
+      const customerPayload =
+        fulfilment === "collection"
+          ? {
+              ...customer,
+              addressLine1: "",
+              suburb: "",
+              city: "",
+              province: "",
+              postalCode: "",
+            }
+          : customer;
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.product.id, qty: i.quantity })),
-          customer,
+          customer: customerPayload,
+          fulfilment,
         }),
       });
       const data = await res.json();
@@ -155,58 +182,138 @@ export default function CheckoutPage() {
             </fieldset>
 
             <fieldset className="space-y-4">
-              <legend className="text-lg font-bold mb-4">Delivery address</legend>
-              <input
-                className={inputClass}
-                placeholder="Street address"
-                required
-                value={customer.addressLine1}
-                onChange={update("addressLine1")}
-              />
-              <div className="grid sm:grid-cols-2 gap-4">
-                <input
-                  className={inputClass}
-                  placeholder="Suburb (optional)"
-                  value={customer.suburb}
-                  onChange={update("suburb")}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="City"
-                  required
-                  value={customer.city}
-                  onChange={update("city")}
-                />
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <select
-                  className={inputClass}
-                  required
-                  value={customer.province}
-                  onChange={update("province")}
+              <legend className="text-lg font-bold mb-4">Fulfilment</legend>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label
+                  className={`cursor-pointer rounded-2xl border p-4 transition-colors ${
+                    fulfilment === "delivery"
+                      ? "border-foreground bg-surface"
+                      : "border-border bg-white hover:border-foreground/50"
+                  }`}
                 >
-                  {provinces.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                  <input
+                    type="radio"
+                    name="fulfilment"
+                    value="delivery"
+                    checked={fulfilment === "delivery"}
+                    onChange={() => setFulfilment("delivery")}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center gap-2 mb-1">
+                    <Truck size={16} aria-hidden />
+                    <span className="font-semibold text-sm">Delivery</span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    Shipped to your address — flat R
+                    {SHIPPING_FLAT_ZAR.toLocaleString("en-ZA")} country-wide
+                  </p>
+                </label>
+                <label
+                  className={`cursor-pointer rounded-2xl border p-4 transition-colors ${
+                    fulfilment === "collection"
+                      ? "border-foreground bg-surface"
+                      : "border-border bg-white hover:border-foreground/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fulfilment"
+                    value="collection"
+                    checked={fulfilment === "collection"}
+                    onChange={() => setFulfilment("collection")}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin size={16} aria-hidden />
+                    <span className="font-semibold text-sm">
+                      Self-collection
+                    </span>
+                    <span className="ml-auto text-xs font-medium text-green">
+                      Free
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    Pick up from {COLLECTION_ADDRESS.name},{" "}
+                    {COLLECTION_ADDRESS.line1}, {COLLECTION_ADDRESS.suburb},{" "}
+                    {COLLECTION_ADDRESS.city} {COLLECTION_ADDRESS.postalCode}
+                  </p>
+                </label>
+              </div>
+              {fulfilment === "collection" && (
+                <p className="text-xs text-muted">
+                  We&rsquo;ll WhatsApp or call you on the number you provide
+                  above when your order is ready to collect.
+                </p>
+              )}
+            </fieldset>
+
+            {fulfilment === "delivery" && (
+              <fieldset className="space-y-4">
+                <legend className="text-lg font-bold mb-4">Delivery address</legend>
                 <input
                   className={inputClass}
-                  placeholder="Postal code"
+                  placeholder="Street address"
                   required
-                  value={customer.postalCode}
-                  onChange={update("postalCode")}
+                  value={customer.addressLine1}
+                  onChange={update("addressLine1")}
                 />
-              </div>
-              <textarea
-                className={inputClass}
-                placeholder="Delivery notes (optional)"
-                rows={3}
-                value={customer.notes}
-                onChange={update("notes")}
-              />
-            </fieldset>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <input
+                    className={inputClass}
+                    placeholder="Suburb (optional)"
+                    value={customer.suburb}
+                    onChange={update("suburb")}
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="City"
+                    required
+                    value={customer.city}
+                    onChange={update("city")}
+                  />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <select
+                    className={inputClass}
+                    required
+                    value={customer.province}
+                    onChange={update("province")}
+                  >
+                    {provinces.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={inputClass}
+                    placeholder="Postal code"
+                    required
+                    value={customer.postalCode}
+                    onChange={update("postalCode")}
+                  />
+                </div>
+                <textarea
+                  className={inputClass}
+                  placeholder="Delivery notes (optional)"
+                  rows={3}
+                  value={customer.notes}
+                  onChange={update("notes")}
+                />
+              </fieldset>
+            )}
+            {fulfilment === "collection" && (
+              <fieldset className="space-y-4">
+                <legend className="text-lg font-bold mb-4">Notes</legend>
+                <textarea
+                  className={inputClass}
+                  placeholder="Any notes for collection (optional)"
+                  rows={3}
+                  value={customer.notes}
+                  onChange={update("notes")}
+                />
+              </fieldset>
+            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -241,8 +348,14 @@ export default function CheckoutPage() {
                   <span>R{subtotal.toLocaleString("en-ZA")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">Shipping</span>
-                  <span>R{shipping.toLocaleString("en-ZA")}</span>
+                  <span className="text-muted">
+                    {fulfilment === "collection" ? "Collection" : "Shipping"}
+                  </span>
+                  <span>
+                    {fulfilment === "collection"
+                      ? "Free"
+                      : `R${shipping.toLocaleString("en-ZA")}`}
+                  </span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-border mt-2">
                   <span className="font-semibold">Total</span>

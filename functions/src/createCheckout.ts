@@ -6,6 +6,7 @@ import {
   FieldValue,
   generateOrderRef,
   type Customer,
+  type Fulfilment,
   type OrderItem,
 } from "./lib/firestore";
 import {
@@ -34,6 +35,7 @@ interface CheckoutRequestItem {
 interface CheckoutRequest {
   items: CheckoutRequestItem[];
   customer: Customer;
+  fulfilment?: Fulfilment;
 }
 
 function applyCors(req: { get: (h: string) => string | undefined }, res: {
@@ -64,25 +66,30 @@ function validate(body: unknown): CheckoutRequest | string {
     }
   }
   const c = b.customer;
-  const req: Array<keyof Customer> = [
-    "firstName",
-    "lastName",
-    "email",
-    "phone",
-    "addressLine1",
-    "city",
-    "province",
-    "postalCode",
-  ];
   if (!c) return "Missing customer";
-  for (const k of req) {
+
+  let fulfilment: Fulfilment = "delivery";
+  if (b.fulfilment !== undefined) {
+    if (b.fulfilment !== "delivery" && b.fulfilment !== "collection") {
+      return "Invalid fulfilment";
+    }
+    fulfilment = b.fulfilment;
+  }
+
+  // Always require contact fields. Address fields are only required when
+  // the order is being delivered.
+  const required: Array<keyof Customer> = ["firstName", "lastName", "email", "phone"];
+  if (fulfilment === "delivery") {
+    required.push("addressLine1", "city", "province", "postalCode");
+  }
+  for (const k of required) {
     const v = (c as unknown as Record<string, unknown>)[k];
     if (typeof v !== "string" || v.trim().length === 0) {
       return `Missing customer.${k}`;
     }
   }
   if (!/^\S+@\S+\.\S+$/.test(c.email)) return "Invalid email";
-  return b as CheckoutRequest;
+  return { ...(b as CheckoutRequest), fulfilment };
 }
 
 export const createCheckout = onRequest(
@@ -123,7 +130,8 @@ export const createCheckout = onRequest(
       subtotal += lineTotal;
     }
 
-    const shipping = SHIPPING_FLAT_ZAR;
+    const fulfilment: Fulfilment = validated.fulfilment ?? "delivery";
+    const shipping = fulfilment === "collection" ? 0 : SHIPPING_FLAT_ZAR;
     const total = subtotal + shipping;
 
     const ref = await generateOrderRef();
@@ -144,6 +152,8 @@ export const createCheckout = onRequest(
       await orderDoc.set({
         ref,
         status: "pending",
+        source: "yoco",
+        fulfilment,
         items,
         subtotal,
         shipping,

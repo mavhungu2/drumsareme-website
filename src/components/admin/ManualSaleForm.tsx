@@ -7,7 +7,9 @@ import {
   createManualSale,
 } from "@/lib/admin/api-client";
 import {
+  COLLECTION_ADDRESS,
   MANUAL_PAYMENT_METHOD_LABEL,
+  type Fulfilment,
   type ManualPaymentMethod,
 } from "@/lib/admin/orders-types";
 import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
@@ -50,6 +52,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [email, setEmail] = useState("");
   const [paymentMethod, setPaymentMethod] =
     useState<ManualPaymentMethod>("cash");
+  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [deliveryFee, setDeliveryFee] = useState("0");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
@@ -65,7 +68,8 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
     }, 0);
   }, [rows]);
 
-  const deliveryFeeNumber = Number.parseFloat(deliveryFee) || 0;
+  const deliveryFeeNumber =
+    fulfilment === "collection" ? 0 : Number.parseFloat(deliveryFee) || 0;
   const total = subtotal + deliveryFeeNumber;
 
   const updateRow = (rowId: string, patch: Partial<LineRow>) => {
@@ -119,6 +123,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           },
           items,
           paymentMethod,
+          fulfilment,
           deliveryFee: deliveryFeeNumber,
           notes: notes.trim() || undefined,
         });
@@ -139,6 +144,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       deliveryFeeNumber,
       email,
       firstName,
+      fulfilment,
       lastName,
       notes,
       onSubmitted,
@@ -290,6 +296,53 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Fulfilment</h2>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label
+            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
+              fulfilment === "delivery"
+                ? "border-foreground bg-surface"
+                : "border-border bg-background hover:bg-surface"
+            }`}
+          >
+            <input
+              type="radio"
+              name="fulfilment"
+              value="delivery"
+              checked={fulfilment === "delivery"}
+              onChange={() => setFulfilment("delivery")}
+              className="sr-only"
+            />
+            <span className="font-medium text-foreground">Delivery</span>
+            <span className="block text-xs text-muted mt-0.5">
+              Customer ships to their address
+            </span>
+          </label>
+          <label
+            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
+              fulfilment === "collection"
+                ? "border-foreground bg-surface"
+                : "border-border bg-background hover:bg-surface"
+            }`}
+          >
+            <input
+              type="radio"
+              name="fulfilment"
+              value="collection"
+              checked={fulfilment === "collection"}
+              onChange={() => setFulfilment("collection")}
+              className="sr-only"
+            />
+            <span className="font-medium text-foreground">Self-collection</span>
+            <span className="block text-xs text-muted mt-0.5">
+              {COLLECTION_ADDRESS.name}, {COLLECTION_ADDRESS.line1},{" "}
+              {COLLECTION_ADDRESS.city}
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Payment</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label
@@ -312,21 +365,30 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               ))}
             </select>
           </label>
-          <label
-            htmlFor={deliveryId}
-            className="flex flex-col gap-1 text-xs font-medium text-muted"
-          >
-            <span>Delivery fee (ZAR)</span>
-            <input
-              id={deliveryId}
-              type="number"
-              min={0}
-              step={0.01}
-              value={deliveryFee}
-              onChange={(e) => setDeliveryFee(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            />
-          </label>
+          {fulfilment === "delivery" ? (
+            <label
+              htmlFor={deliveryId}
+              className="flex flex-col gap-1 text-xs font-medium text-muted"
+            >
+              <span>Delivery fee (ZAR)</span>
+              <input
+                id={deliveryId}
+                type="number"
+                min={0}
+                step={0.01}
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(e.target.value)}
+                className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            </label>
+          ) : (
+            <div className="flex flex-col gap-1 text-xs font-medium text-muted">
+              <span>Delivery fee</span>
+              <p className="h-10 inline-flex items-center px-3 text-sm text-muted">
+                Free (collection)
+              </p>
+            </div>
+          )}
           <label
             htmlFor={notesId}
             className="flex flex-col gap-1 text-xs font-medium text-muted"

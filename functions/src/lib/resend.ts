@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import type { Order, OrderTracking } from "./firestore";
+import { COLLECTION_ADDRESS, type Order, type OrderTracking } from "./firestore";
 
 const FROM = "DrumsAreMe <orders@drumsareme.co.za>";
 
@@ -39,18 +39,32 @@ function emailContainer(innerHtml: string): string {
   </div>`;
 }
 
+function fulfilmentBlockHtml(order: Order): string {
+  if (order.fulfilment === "collection") {
+    const a = COLLECTION_ADDRESS;
+    return `
+      <h3 style="margin:24px 0 8px;font-size:14px">Self-collection</h3>
+      <p style="margin:0 0 8px;font-size:14px;color:#374151">${order.customer.firstName} ${order.customer.lastName}<br>${order.customer.phone} &middot; ${order.customer.email}</p>
+      <p style="margin:0;font-size:14px;color:#374151"><strong>Pick up from:</strong><br>${a.name}<br>${a.line1}, ${a.suburb}<br>${a.city}, ${a.postalCode}</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#6b7280">We'll WhatsApp / call you when it's ready to collect.</p>`;
+  }
+  return `
+      <h3 style="margin:24px 0 8px;font-size:14px">Delivery</h3>
+      <p style="margin:0;font-size:14px;color:#374151">${order.customer.firstName} ${order.customer.lastName}<br>${customerAddress(order)}<br>${order.customer.phone} &middot; ${order.customer.email}</p>`;
+}
+
 function orderBodyHtml(order: Order, intro: string): string {
+  const shippingLabel = order.fulfilment === "collection" ? "Collection" : "Shipping";
   return emailContainer(`
     <h2 style="margin:0 0 8px">${intro}</h2>
     <p style="color:#6b7280;margin:0 0 24px">Order <strong>${order.ref}</strong></p>
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       ${itemsHtml(order)}
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
-      <tr><td style="padding:6px 0">Shipping</td><td style="padding:6px 0;text-align:right">${formatZAR(order.shipping)}</td></tr>
+      <tr><td style="padding:6px 0">${shippingLabel}</td><td style="padding:6px 0;text-align:right">${order.fulfilment === "collection" ? "Free" : formatZAR(order.shipping)}</td></tr>
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
     </table>
-    <h3 style="margin:24px 0 8px;font-size:14px">Delivery</h3>
-    <p style="margin:0;font-size:14px;color:#374151">${order.customer.firstName} ${order.customer.lastName}<br>${customerAddress(order)}<br>${order.customer.phone} &middot; ${order.customer.email}</p>
+    ${fulfilmentBlockHtml(order)}
     ${order.customer.notes ? `<p style="margin:12px 0 0;font-size:13px;color:#6b7280"><em>Note:</em> ${order.customer.notes}</p>` : ""}
   `);
 }

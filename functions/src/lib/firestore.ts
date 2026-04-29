@@ -41,12 +41,27 @@ export interface OrderTracking {
 
 export type OrderSource = "yoco" | "manual";
 export type ManualPaymentMethod = "cash" | "card" | "eft";
+export type Fulfilment = "delivery" | "collection";
+
+/**
+ * Shared collection address. The retailer offers customer self-collection from
+ * Spring Glade, so the storefront and admin both show this string. Update it
+ * here if the address ever changes.
+ */
+export const COLLECTION_ADDRESS = {
+  name: "Spring Glade",
+  line1: "Vermooten Rd",
+  suburb: "Princess",
+  city: "Roodepoort",
+  postalCode: "1724",
+} as const;
 
 export interface Order {
   ref: string;
   status: "pending" | "paid" | "failed" | "shipped" | "cancelled";
   source?: OrderSource;
   manualPaymentMethod?: ManualPaymentMethod;
+  fulfilment?: Fulfilment;
   inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;

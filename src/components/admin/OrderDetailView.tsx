@@ -1,5 +1,9 @@
-import { Ban, Loader2, Mail, Truck } from "lucide-react";
-import type { Order } from "@/lib/admin/orders-types";
+import { Ban, Loader2, Mail, MapPin, Truck } from "lucide-react";
+import {
+  COLLECTION_ADDRESS,
+  formatCollectionAddress,
+  type Order,
+} from "@/lib/admin/orders-types";
 import { formatDate, formatDateTime, formatZar } from "@/lib/admin/format";
 import OrderStatusBadge from "./OrderStatusBadge";
 import AddNoteForm from "./AddNoteForm";
@@ -62,6 +66,21 @@ export default function OrderDetailView({
     Boolean(onResendReceipt) &&
     (order.status === "paid" || order.status === "shipped");
 
+  const isCollection = order.fulfilment === "collection";
+
+  const fulfilmentValue = isCollection ? (
+    <span className="inline-flex items-center gap-1.5">
+      <MapPin size={14} className="text-foreground" aria-hidden />
+      Self-collection — {COLLECTION_ADDRESS.name},{" "}
+      {COLLECTION_ADDRESS.line1}, {COLLECTION_ADDRESS.city}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5">
+      <Truck size={14} className="text-foreground" aria-hidden />
+      Delivery
+    </span>
+  );
+
   const customerRows: DetailRow[] = [
     {
       label: "Name",
@@ -69,17 +88,20 @@ export default function OrderDetailView({
     },
     { label: "Email", value: order.customer.email || "—" },
     { label: "Phone", value: order.customer.phone || "—" },
+    { label: "Fulfilment", value: fulfilmentValue },
     {
-      label: "Address",
-      value: [
-        order.customer.addressLine1,
-        order.customer.suburb,
-        order.customer.city,
-        order.customer.province,
-        order.customer.postalCode,
-      ]
-        .filter(Boolean)
-        .join(", ") || "—",
+      label: isCollection ? "Collection point" : "Delivery address",
+      value: isCollection
+        ? formatCollectionAddress()
+        : [
+            order.customer.addressLine1,
+            order.customer.suburb,
+            order.customer.city,
+            order.customer.province,
+            order.customer.postalCode,
+          ]
+            .filter(Boolean)
+            .join(", ") || "—",
     },
     {
       label: "Notes",

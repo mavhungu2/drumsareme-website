@@ -14,6 +14,20 @@ export type OrderStatus =
 
 export type OrderSource = "yoco" | "manual";
 export type ManualPaymentMethod = "cash" | "card" | "eft";
+export type Fulfilment = "delivery" | "collection";
+
+export const COLLECTION_ADDRESS = {
+  name: "Spring Glade",
+  line1: "Vermooten Rd",
+  suburb: "Princess",
+  city: "Roodepoort",
+  postalCode: "1724",
+} as const;
+
+export function formatCollectionAddress(): string {
+  const a = COLLECTION_ADDRESS;
+  return `${a.name}, ${a.line1}, ${a.suburb}, ${a.city} ${a.postalCode}`;
+}
 
 export const MANUAL_PAYMENT_METHOD_LABEL: Readonly<
   Record<ManualPaymentMethod, string>
@@ -62,6 +76,7 @@ export interface Order {
   status: OrderStatus;
   source?: OrderSource;
   manualPaymentMethod?: ManualPaymentMethod;
+  fulfilment?: Fulfilment;
   inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;

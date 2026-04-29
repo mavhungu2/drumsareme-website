@@ -79,6 +79,7 @@ export interface ManualSaleInput {
   };
   items: ManualSaleItemInput[];
   paymentMethod: "cash" | "card" | "eft";
+  fulfilment: "delivery" | "collection";
   deliveryFee: number;
   notes?: string;
 }
