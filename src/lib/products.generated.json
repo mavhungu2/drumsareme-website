@@ -2,7 +2,7 @@
   {
     "id": "7a-natural",
     "slug": "7a-natural",
-    "name": "Keep Time 7A - Natural",
+    "name": "Keep Time 7A - Natural test",
     "size": "7A",
     "color": "Natural",
     "price": 150,
@@ -14,7 +14,7 @@
       "Ideal for jazz, light-touch styles",
       "Smooth lacquer finish"
     ],
-    "image": "/images/gallery/IMG_7489.jpg",
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/7a-natural/1777506600028.png",
     "inStock": true,
     "sortOrder": 0
   },
@@ -112,6 +112,21 @@
       "Smooth grip coating"
     ],
     "image": "/images/gallery/20260110_165902.jpg",
+    "inStock": true,
+    "sortOrder": 5
+  },
+  {
+    "id": "isaac",
+    "slug": "isaac",
+    "name": "Mpharalala",
+    "size": "0826092370",
+    "color": "mavhungu2@gmail.com",
+    "price": 123,
+    "description": "test",
+    "features": [
+      "test feature"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/isaac/1777506435799.png",
     "inStock": true,
     "sortOrder": 5
   },
