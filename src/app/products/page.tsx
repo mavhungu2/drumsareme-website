@@ -5,8 +5,28 @@ import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { Check, ShoppingCart } from "lucide-react";
 import { products, sizes, colors, type Product } from "@/lib/products";
-import { useLiveProducts } from "@/lib/use-live-products";
+import { useLiveProducts, useStock } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
+
+function StockBadge({ productId }: { productId: string }) {
+  const stock = useStock(productId);
+  if (stock === undefined) return null;
+  if (stock <= 0) {
+    return (
+      <span className="text-xs font-medium text-red-700">Sold out</span>
+    );
+  }
+  if (stock <= 3) {
+    return (
+      <span className="text-xs font-medium text-amber-700">
+        Only {stock} left
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs text-muted">{stock} in stock</span>
+  );
+}
 
 export default function ProductsPage() {
   const { addItem } = useCart();
@@ -168,7 +188,10 @@ export default function ProductsPage() {
                   <h3 className="font-semibold text-sm sm:text-base">
                     {product.name}
                   </h3>
-                  <p className="text-sm text-muted">R{product.price}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-muted">R{product.price}</p>
+                    <StockBadge productId={product.id} />
+                  </div>
                 </Link>
               );
             })}

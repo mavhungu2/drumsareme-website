@@ -5,16 +5,34 @@ import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { ArrowLeft, Minus, Plus, ShoppingCart, Check } from "lucide-react";
 import { products, getProduct, type Product } from "@/lib/products";
-import { useLiveProduct } from "@/lib/use-live-products";
+import { useLiveProduct, useStock } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
+
+function StockBadge({ productId }: { productId: string }) {
+  const stock = useStock(productId);
+  if (stock === undefined) return null;
+  if (stock <= 0) {
+    return <span className="text-xs font-medium text-red-700">Sold out</span>;
+  }
+  if (stock <= 3) {
+    return (
+      <span className="text-xs font-medium text-amber-700">
+        Only {stock} left
+      </span>
+    );
+  }
+  return <span className="text-xs text-muted">{stock} in stock</span>;
+}
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
   const baked = getProduct(slug);
   const product = useLiveProduct(baked ?? products[0]);
+  const stock = useStock(baked?.id ?? "");
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [quickAddedId, setQuickAddedId] = useState<string | null>(null);
+  const soldOut = stock !== undefined && stock <= 0;
 
   const quickAdd = (item: Product) => (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -85,9 +103,24 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               {product.name}
             </h1>
 
-            <div className="flex items-baseline gap-3 mb-6">
+            <div className="flex items-baseline gap-3 mb-2">
               <span className="text-2xl font-bold">R{product.price}</span>
               <span className="text-sm text-muted">per pair</span>
+            </div>
+            <div className="mb-6">
+              {stock === undefined ? null : stock <= 0 ? (
+                <span className="text-sm font-medium text-red-700">
+                  Sold out
+                </span>
+              ) : stock <= 3 ? (
+                <span className="text-sm font-medium text-amber-700">
+                  Only {stock} left in stock
+                </span>
+              ) : (
+                <span className="text-sm text-muted">
+                  {stock} in stock
+                </span>
+              )}
             </div>
 
             <p className="text-muted leading-relaxed mb-8">
@@ -132,14 +165,16 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
               <button
                 onClick={handleAdd}
-                disabled={added}
-                className={`flex-1 inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-sm font-semibold transition-colors ${
+                disabled={added || soldOut}
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                   added
                     ? "bg-green text-white"
                     : "bg-foreground text-white hover:bg-gray-800"
                 }`}
               >
-                {added ? (
+                {soldOut ? (
+                  "Sold out"
+                ) : added ? (
                   <>
                     <Check size={16} />
                     Added to Cart
@@ -194,7 +229,10 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       </button>
                     </div>
                     <h3 className="font-medium text-sm">{p.name}</h3>
-                    <p className="text-sm text-muted">R{p.price}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-muted">R{p.price}</p>
+                      <StockBadge productId={p.id} />
+                    </div>
                   </Link>
                 );
               })}

@@ -9,6 +9,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Public stock counts so the storefront can show "X in stock" per SKU.
+    // Reading currentStock alongside reorderLevel is intentional — it's not
+    // sensitive. Writes still go through adminInventory / yocoWebhook.
+    match /inventory/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Default: deny everything. All other collections (orders, inventory,
     // expenses, admins) are read/written exclusively via Cloud Functions
     // running with the Admin SDK, which bypasses these rules.

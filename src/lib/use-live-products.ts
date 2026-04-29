@@ -9,6 +9,7 @@ import type { Product } from "./products";
 interface LiveOverlayEntry {
   price: number;
   inStock: boolean;
+  stock?: number;
   name?: string;
   description?: string;
   features?: string[];
@@ -39,9 +40,22 @@ async function loadOverlay(): Promise<LiveOverlay> {
   inflight = (async () => {
     try {
       const db = getFirestore(getReadonlyApp());
-      const snap = await getDocs(collection(db, "products"));
+      const [productsSnap, inventorySnap] = await Promise.all([
+        getDocs(collection(db, "products")),
+        getDocs(collection(db, "inventory")),
+      ]);
+      const stockByProduct = new Map<string, number>();
+      inventorySnap.forEach((doc) => {
+        const data = doc.data() as { currentStock?: unknown };
+        if (
+          typeof data.currentStock === "number" &&
+          Number.isFinite(data.currentStock)
+        ) {
+          stockByProduct.set(doc.id, data.currentStock);
+        }
+      });
       const map = new Map<string, LiveOverlayEntry>();
-      snap.forEach((doc) => {
+      productsSnap.forEach((doc) => {
         const data = doc.data() as {
           price?: unknown;
           inStock?: unknown;
@@ -57,6 +71,8 @@ async function loadOverlay(): Promise<LiveOverlay> {
         if (price === undefined) return;
         const inStock = data.inStock !== false;
         const entry: LiveOverlayEntry = { price, inStock };
+        const stock = stockByProduct.get(doc.id);
+        if (stock !== undefined) entry.stock = stock;
         if (typeof data.name === "string" && data.name.length > 0) {
           entry.name = data.name;
         }
@@ -132,4 +148,13 @@ export function useLiveProducts(items: ReadonlyArray<Product>): Product[] {
     () => items.map((product) => applyOverlay(product, overlay.get(product.id))),
     [overlay, items],
   );
+}
+
+/**
+ * Returns the current stock count for a product, or `undefined` if inventory
+ * data hasn't loaded yet or no inventory row exists for this product.
+ */
+export function useStock(productId: string): number | undefined {
+  const overlay = useLiveOverlay();
+  return overlay.get(productId)?.stock;
 }
