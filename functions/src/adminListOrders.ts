@@ -4,8 +4,9 @@ import { db, Timestamp, type Order } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 
+// Pending intentionally excluded — those orders are filtered out of the list
+// response, so accepting it as a query parameter would always return zero rows.
 const VALID_STATUSES: ReadonlyArray<Order["status"]> = [
-  "pending",
   "paid",
   "failed",
   "shipped",
@@ -182,9 +183,16 @@ export const adminListOrders = onRequest(
       // Substring search (ref / email) is applied in-memory because Firestore
       // does not support `LIKE`-style queries. This is safe at the current
       // volume; revisit with Algolia / Typesense if the dataset grows.
+      // Pending orders are abandoned-checkout placeholders; never expose them
+      // to the admin list. They still exist in Firestore so the Yoco webhook
+      // can flip them to paid if/when payment lands.
+      const visible = pageDocs.filter(
+        (doc) => (doc.data() as Order).status !== "pending",
+      );
+
       const filtered = parsed.q
-        ? pageDocs.filter((doc) => matchesSearch(doc.data() as Order, parsed.q!))
-        : pageDocs;
+        ? visible.filter((doc) => matchesSearch(doc.data() as Order, parsed.q!))
+        : visible;
 
       const orders = filtered.map((doc) => toListItem(doc.id, doc.data() as Order));
       const nextCursor = hasMore ? pageDocs[pageDocs.length - 1].id : null;

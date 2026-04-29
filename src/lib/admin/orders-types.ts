@@ -109,8 +109,10 @@ export interface ListOrdersQuery {
   cursor?: string;
 }
 
+// Pending is excluded from the admin filter dropdown — the list endpoint
+// strips pending rows server-side, so offering it as a filter would always
+// return empty results.
 export const ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
-  "pending",
   "paid",
   "failed",
   "shipped",
