@@ -6,12 +6,6 @@ import {
   AdminApiError,
   createManualSale,
 } from "@/lib/admin/api-client";
-import {
-  COLLECTION_ADDRESS,
-  MANUAL_PAYMENT_METHOD_LABEL,
-  type Fulfilment,
-  type ManualPaymentMethod,
-} from "@/lib/admin/orders-types";
 import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
 import { products } from "@/lib/products";
 import { formatZar } from "@/lib/admin/format";
@@ -34,15 +28,11 @@ function newRow(productId: string): LineRow {
   };
 }
 
-const PAYMENTS: ManualPaymentMethod[] = ["cash", "card", "eft"];
-
 export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const firstNameId = useId();
   const lastNameId = useId();
   const phoneId = useId();
   const emailId = useId();
-  const paymentId = useId();
-  const deliveryId = useId();
   const notesId = useId();
 
   const defaultProductId = products[0]?.id ?? "";
@@ -50,10 +40,6 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [paymentMethod, setPaymentMethod] =
-    useState<ManualPaymentMethod>("cash");
-  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
-  const [deliveryFee, setDeliveryFee] = useState("0");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
   const [submitting, setSubmitting] = useState(false);
@@ -67,10 +53,6 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       return sum + product.price * qty;
     }, 0);
   }, [rows]);
-
-  const deliveryFeeNumber =
-    fulfilment === "collection" ? 0 : Number.parseFloat(deliveryFee) || 0;
-  const total = subtotal + deliveryFeeNumber;
 
   const updateRow = (rowId: string, patch: Partial<LineRow>) => {
     setRows((prev) =>
@@ -107,9 +89,6 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         }
         items.push({ productId: product.id, qty });
       }
-      if (!Number.isFinite(deliveryFeeNumber) || deliveryFeeNumber < 0) {
-        return setError("Delivery fee must be a non-negative number.");
-      }
 
       setSubmitting(true);
       setError(null);
@@ -122,9 +101,6 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
             email: email.trim() || undefined,
           },
           items,
-          paymentMethod,
-          fulfilment,
-          deliveryFee: deliveryFeeNumber,
           notes: notes.trim() || undefined,
         });
         onSubmitted(response);
@@ -140,18 +116,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         setSubmitting(false);
       }
     },
-    [
-      deliveryFeeNumber,
-      email,
-      firstName,
-      fulfilment,
-      lastName,
-      notes,
-      onSubmitted,
-      paymentMethod,
-      phone,
-      rows,
-    ],
+    [email, firstName, lastName, notes, onSubmitted, phone, rows],
   );
 
   return (
@@ -160,6 +125,12 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       noValidate
       className="rounded-2xl border border-border bg-background p-5 sm:p-6 space-y-5"
     >
+      <p className="text-xs text-muted">
+        This saves the order as <strong>pending</strong>. Open the order from
+        the list to capture payment method, fulfilment, and decrement stock
+        when payment lands.
+      </p>
+
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Customer</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -296,129 +267,31 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold text-foreground">Fulfilment</h2>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label
-            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
-              fulfilment === "delivery"
-                ? "border-foreground bg-surface"
-                : "border-border bg-background hover:bg-surface"
-            }`}
-          >
-            <input
-              type="radio"
-              name="fulfilment"
-              value="delivery"
-              checked={fulfilment === "delivery"}
-              onChange={() => setFulfilment("delivery")}
-              className="sr-only"
-            />
-            <span className="font-medium text-foreground">Delivery</span>
-            <span className="block text-xs text-muted mt-0.5">
-              Customer ships to their address
-            </span>
-          </label>
-          <label
-            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
-              fulfilment === "collection"
-                ? "border-foreground bg-surface"
-                : "border-border bg-background hover:bg-surface"
-            }`}
-          >
-            <input
-              type="radio"
-              name="fulfilment"
-              value="collection"
-              checked={fulfilment === "collection"}
-              onChange={() => setFulfilment("collection")}
-              className="sr-only"
-            />
-            <span className="font-medium text-foreground">Self-collection</span>
-            <span className="block text-xs text-muted mt-0.5">
-              {COLLECTION_ADDRESS.name}, {COLLECTION_ADDRESS.line1},{" "}
-              {COLLECTION_ADDRESS.city}
-            </span>
-          </label>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-foreground">Payment</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <label
-            htmlFor={paymentId}
-            className="flex flex-col gap-1 text-xs font-medium text-muted"
-          >
-            <span>Payment method</span>
-            <select
-              id={paymentId}
-              value={paymentMethod}
-              onChange={(e) =>
-                setPaymentMethod(e.target.value as ManualPaymentMethod)
-              }
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              {PAYMENTS.map((p) => (
-                <option key={p} value={p}>
-                  {MANUAL_PAYMENT_METHOD_LABEL[p]}
-                </option>
-              ))}
-            </select>
-          </label>
-          {fulfilment === "delivery" ? (
-            <label
-              htmlFor={deliveryId}
-              className="flex flex-col gap-1 text-xs font-medium text-muted"
-            >
-              <span>Delivery fee (ZAR)</span>
-              <input
-                id={deliveryId}
-                type="number"
-                min={0}
-                step={0.01}
-                value={deliveryFee}
-                onChange={(e) => setDeliveryFee(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              />
-            </label>
-          ) : (
-            <div className="flex flex-col gap-1 text-xs font-medium text-muted">
-              <span>Delivery fee</span>
-              <p className="h-10 inline-flex items-center px-3 text-sm text-muted">
-                Free (collection)
-              </p>
-            </div>
-          )}
-          <label
-            htmlFor={notesId}
-            className="flex flex-col gap-1 text-xs font-medium text-muted"
-          >
-            <span>Notes (optional)</span>
-            <input
-              id={notesId}
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            />
-          </label>
-        </div>
+        <h2 className="text-base font-semibold text-foreground">Notes</h2>
+        <label
+          htmlFor={notesId}
+          className="flex flex-col gap-1 text-xs font-medium text-muted"
+        >
+          <span>Optional internal notes</span>
+          <input
+            id={notesId}
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </label>
       </section>
 
       <section className="border-t border-border pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <dl className="text-sm text-muted space-y-1 tabular-nums">
-          <div className="flex gap-3 justify-between sm:justify-start">
+        <dl className="text-sm text-foreground space-y-1 tabular-nums">
+          <div className="flex gap-3 justify-between sm:justify-start font-semibold">
             <dt>Subtotal</dt>
             <dd>{formatZar(subtotal)}</dd>
           </div>
-          <div className="flex gap-3 justify-between sm:justify-start">
-            <dt>Delivery</dt>
-            <dd>{formatZar(deliveryFeeNumber || 0)}</dd>
-          </div>
-          <div className="flex gap-3 justify-between sm:justify-start text-foreground font-semibold">
-            <dt>Total</dt>
-            <dd>{formatZar(total)}</dd>
-          </div>
+          <p className="text-xs text-muted font-normal">
+            Delivery fee added when marking the order paid.
+          </p>
         </dl>
         <button
           type="submit"
@@ -428,10 +301,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           {submitting ? (
             <>
               <Loader2 size={14} className="animate-spin" aria-hidden />
-              Recording…
+              Saving…
             </>
           ) : (
-            "Record sale"
+            "Save as pending"
           )}
         </button>
       </section>

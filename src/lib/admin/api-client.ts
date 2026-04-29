@@ -29,6 +29,8 @@ import type {
   AnalyticsResponse,
   ManualSaleInput,
   ManualSaleResponse,
+  MarkPaidInput,
+  MarkPaidResponse,
 } from "./analytics-types";
 import type {
   CreateProductInput,
@@ -380,6 +382,21 @@ export async function createManualSale(
 ): Promise<ManualSaleResponse> {
   const url = buildUrl("/api/admin/sales/manual");
   return requestJson<ManualSaleResponse>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function markOrderPaid(
+  id: string,
+  input: MarkPaidInput,
+): Promise<MarkPaidResponse> {
+  if (!id) throw new AdminApiError(400, "Missing order id");
+  const url = buildUrl(
+    `/api/admin/orders/${encodeURIComponent(id)}/mark-paid`,
+  );
+  return requestJson<MarkPaidResponse>(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

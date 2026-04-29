@@ -96,6 +96,7 @@ async function probeUnauthenticated() {
     ["GET", "/api/admin/orders/anything"],
     ["POST", "/api/admin/orders/anything/notes"],
     ["POST", "/api/admin/orders/anything/cancel"],
+    ["POST", "/api/admin/orders/anything/mark-paid"],
     ["POST", "/api/admin/orders/anything/mark-shipped"],
     ["POST", "/api/admin/orders/anything/resend-receipt"],
     ["GET", "/api/admin/inventory"],
@@ -225,7 +226,7 @@ async function authenticatedSuite(token: string) {
   );
   record("GET /api/admin/orders", ordersList.status);
 
-  // === MANUAL SALE → cancel cycle ===
+  // === MANUAL SALE pending → mark-paid → cancel cycle ===
   const manualSale = await call("POST", "/api/admin/sales/manual", token, {
     customer: {
       firstName: "Smoke",
@@ -233,10 +234,8 @@ async function authenticatedSuite(token: string) {
       phone: "0000000000",
     },
     items: [{ productId: "7a-natural", qty: 1 }],
-    paymentMethod: "cash",
-    deliveryFee: 0,
   });
-  record("POST /api/admin/sales/manual", manualSale.status, 201);
+  record("POST /api/admin/sales/manual (pending)", manualSale.status, 201);
 
   const manualOrderId = (manualSale.data as { id?: string } | null)?.id;
   if (manualOrderId) {
@@ -254,6 +253,33 @@ async function authenticatedSuite(token: string) {
       { body: "Smoke test note" },
     );
     record("POST /api/admin/orders/:id/notes", addNote.status, 201);
+
+    const markPaid = await call(
+      "POST",
+      `/api/admin/orders/${manualOrderId}/mark-paid`,
+      token,
+      {
+        manualPaymentMethod: "cash",
+        fulfilment: "collection",
+        deliveryFee: 0,
+      },
+    );
+    record("POST /api/admin/orders/:id/mark-paid", markPaid.status);
+
+    const markPaidAgain = await call(
+      "POST",
+      `/api/admin/orders/${manualOrderId}/mark-paid`,
+      token,
+      {
+        manualPaymentMethod: "cash",
+        fulfilment: "collection",
+        deliveryFee: 0,
+      },
+    );
+    record(
+      "POST /api/admin/orders/:id/mark-paid (idempotent)",
+      markPaidAgain.status,
+    );
 
     const cancel = await call(
       "POST",

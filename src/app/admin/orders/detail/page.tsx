@@ -14,6 +14,7 @@ import type { Order } from "@/lib/admin/orders-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import OrderDetailView from "@/components/admin/OrderDetailView";
 import MarkShippedDialog from "@/components/admin/MarkShippedDialog";
+import MarkPaidDialog from "@/components/admin/MarkPaidDialog";
 import CancelOrderDialog from "@/components/admin/CancelOrderDialog";
 
 type MutationBanner =
@@ -107,6 +108,7 @@ function OrderDetailContent() {
   );
   const [shipDialogOpen, setShipDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [paidDialogOpen, setPaidDialogOpen] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!id || !user) return;
@@ -143,6 +145,20 @@ function OrderDetailContent() {
     setMutationBanner(null);
     try {
       await refetch();
+    } finally {
+      setMutating(false);
+    }
+  }, [refetch]);
+
+  const handleMarkedPaid = useCallback(async () => {
+    setMutating(true);
+    setMutationBanner(null);
+    try {
+      await refetch();
+      setMutationBanner({
+        kind: "success",
+        message: "Order marked as paid. Stock decremented.",
+      });
     } finally {
       setMutating(false);
     }
@@ -233,10 +249,17 @@ function OrderDetailContent() {
       <OrderDetailView
         order={order}
         mutating={mutating}
+        onMarkPaid={() => setPaidDialogOpen(true)}
         onMarkShipped={() => setShipDialogOpen(true)}
         onCancel={() => setCancelDialogOpen(true)}
         onResendReceipt={handleResendReceipt}
         onAddNote={handleAddNote}
+      />
+      <MarkPaidDialog
+        orderId={order.id}
+        open={paidDialogOpen}
+        onClose={() => setPaidDialogOpen(false)}
+        onMarked={handleMarkedPaid}
       />
       <MarkShippedDialog
         orderId={order.id}

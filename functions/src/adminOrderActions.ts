@@ -6,13 +6,16 @@ import {
   db,
   FieldValue,
   Timestamp,
+  type Fulfilment,
   type InventoryItem,
+  type ManualPaymentMethod,
   type Order,
   type OrderNote,
   type OrderTracking,
 } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
+import { InsufficientStockError } from "./lib/errors";
 import {
   sendCancellationNotification,
   sendCustomerReceipt,
@@ -41,6 +44,11 @@ const MAX_TRACKING_FIELD_LEN = 100;
 const MAX_NOTE_LEN = 2000;
 const MAX_CANCEL_REASON_LEN = 500;
 const RECEIPT_RESEND_WINDOW_MS = 10 * 60 * 1000;
+const VALID_PAYMENT_METHODS: ReadonlyArray<ManualPaymentMethod> = [
+  "cash",
+  "card",
+  "eft",
+];
 
 function parsePath(rawPath: string): string[] {
   // Firebase rewrites forward the full path (e.g. /api/admin/orders/abc/cancel)
@@ -425,6 +433,211 @@ const adminCancelOrder: Handler = async ({ req, res, uid, orderId }) => {
   res.status(200).json({ ok: true, status: "cancelled" });
 };
 
+interface MarkPaidInput {
+  manualPaymentMethod: ManualPaymentMethod;
+  fulfilment: Fulfilment;
+  deliveryFee: number;
+}
+
+function validateMarkPaidInput(
+  body: Record<string, unknown>,
+): { ok: true; input: MarkPaidInput } | { ok: false; error: string } {
+  const { manualPaymentMethod, fulfilment, deliveryFee, ...extra } = body;
+  if (Object.keys(extra).length > 0) {
+    return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+  if (
+    typeof manualPaymentMethod !== "string" ||
+    !VALID_PAYMENT_METHODS.includes(manualPaymentMethod as ManualPaymentMethod)
+  ) {
+    return {
+      ok: false,
+      error: `manualPaymentMethod must be one of ${VALID_PAYMENT_METHODS.join(", ")}`,
+    };
+  }
+  if (fulfilment !== "delivery" && fulfilment !== "collection") {
+    return { ok: false, error: "fulfilment must be 'delivery' or 'collection'" };
+  }
+  let fee = 0;
+  if (deliveryFee !== undefined) {
+    if (
+      typeof deliveryFee !== "number" ||
+      !Number.isFinite(deliveryFee) ||
+      deliveryFee < 0
+    ) {
+      return { ok: false, error: "deliveryFee must be a non-negative number" };
+    }
+    fee = Math.round(deliveryFee * 100) / 100;
+  }
+  if (fulfilment === "collection" && fee > 0) {
+    return {
+      ok: false,
+      error: "deliveryFee must be 0 for collection orders",
+    };
+  }
+  return {
+    ok: true,
+    input: {
+      manualPaymentMethod: manualPaymentMethod as ManualPaymentMethod,
+      fulfilment,
+      deliveryFee: fee,
+    },
+  };
+}
+
+const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
+  const parsed = parseJsonBody(req);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const validated = validateMarkPaidInput(parsed.body);
+  if (!validated.ok) {
+    res.status(400).json({ error: validated.error });
+    return;
+  }
+  const { input } = validated;
+
+  const orderRef = db.collection("orders").doc(orderId);
+
+  type TxResult =
+    | { kind: "not-found" }
+    | { kind: "bad-status"; status: Order["status"] }
+    | { kind: "bad-source"; source: string | undefined }
+    | { kind: "ok" };
+
+  try {
+    const result = await db.runTransaction<TxResult>(async (tx) => {
+      const snap = await tx.get(orderRef);
+      if (!snap.exists) return { kind: "not-found" };
+      const order = snap.data() as Order;
+      if (order.status === "paid" || order.inventoryApplied === true) {
+        // Idempotent: already marked paid by a concurrent click.
+        return { kind: "ok" };
+      }
+      if (order.status !== "pending") {
+        return { kind: "bad-status", status: order.status };
+      }
+      if (order.source !== "manual") {
+        return { kind: "bad-source", source: order.source };
+      }
+
+      const inventoryRefs = (order.items ?? []).map((item) => ({
+        ref: db.collection("inventory").doc(item.productId),
+        qty: item.qty,
+        name: item.name,
+      }));
+      const inventorySnaps = await Promise.all(
+        inventoryRefs.map(({ ref }) => tx.get(ref)),
+      );
+
+      // Reject the transition if any tracked SKU has insufficient stock.
+      // Untracked SKUs (no inventory doc) are created on-demand below.
+      for (let i = 0; i < inventorySnaps.length; i += 1) {
+        const invSnap = inventorySnaps[i];
+        if (!invSnap.exists) continue;
+        const item = invSnap.data() as InventoryItem;
+        const available = Math.max(
+          0,
+          (item.openingStock ?? 0) - (item.unitsSold ?? 0),
+        );
+        if (inventoryRefs[i].qty > available) {
+          throw new InsufficientStockError(
+            inventoryRefs[i].name,
+            available,
+          );
+        }
+      }
+
+      inventorySnaps.forEach((snap, i) => {
+        const { ref: invRef, qty, name } = inventoryRefs[i];
+        if (snap.exists) {
+          const item = snap.data() as InventoryItem;
+          const nextSold = (item.unitsSold ?? 0) + qty;
+          const nextStock = Math.max(0, item.openingStock - nextSold);
+          tx.update(invRef, {
+            unitsSold: nextSold,
+            currentStock: nextStock,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.set(invRef, {
+            productId: invRef.id,
+            name,
+            openingStock: 0,
+            unitsSold: qty,
+            currentStock: 0,
+            reorderLevel: 0,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+
+      const total = (order.subtotal ?? 0) + input.deliveryFee;
+      tx.update(orderRef, {
+        status: "paid",
+        paidAt: FieldValue.serverTimestamp(),
+        manualPaymentMethod: input.manualPaymentMethod,
+        fulfilment: input.fulfilment,
+        shipping: input.deliveryFee,
+        total,
+        inventoryApplied: true,
+      });
+
+      return { kind: "ok" };
+    });
+
+    if (result.kind === "not-found") {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (result.kind === "bad-status") {
+      res.status(409).json({
+        error: `Cannot mark ${result.status} order as paid`,
+      });
+      return;
+    }
+    if (result.kind === "bad-source") {
+      res.status(409).json({
+        error: "Only manual orders can be marked paid here — Yoco orders flip via the payment webhook",
+      });
+      return;
+    }
+
+    logger.info("adminOrderActions", {
+      uid,
+      action: "mark-paid",
+      orderId,
+      manualPaymentMethod: input.manualPaymentMethod,
+      fulfilment: input.fulfilment,
+      deliveryFee: input.deliveryFee,
+    });
+    res.status(200).json({
+      ok: true,
+      status: "paid",
+      manualPaymentMethod: input.manualPaymentMethod,
+      fulfilment: input.fulfilment,
+      shipping: input.deliveryFee,
+    });
+  } catch (err) {
+    if (err instanceof InsufficientStockError) {
+      logger.info("adminOrderActions mark-paid rejected — insufficient stock", {
+        uid,
+        orderId,
+        product: err.productName,
+        available: err.available,
+      });
+      res.status(409).json({
+        error: err.message,
+        available: err.available,
+        productName: err.productName,
+      });
+      return;
+    }
+    throw err;
+  }
+};
+
 const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   const orderRef = db.collection("orders").doc(orderId);
 
@@ -522,6 +735,12 @@ const ROUTES: Array<{
     subPath: "cancel",
     entries: [
       { method: "POST", action: "cancel", handler: adminCancelOrder },
+    ],
+  },
+  {
+    subPath: "mark-paid",
+    entries: [
+      { method: "POST", action: "mark-paid", handler: adminMarkPaid },
     ],
   },
   {

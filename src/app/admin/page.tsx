@@ -130,19 +130,19 @@ export default function AdminDashboardPage() {
             Order status
           </h2>
           <ul className="space-y-2 text-sm">
-            {(["paid", "shipped", "failed", "cancelled"] as const).map(
-              (status) => (
-                <li
-                  key={status}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
-                >
-                  <span className="text-muted capitalize">{status}</span>
-                  <span className="font-semibold tabular-nums">
-                    {data?.statuses[status] ?? 0}
-                  </span>
-                </li>
-              ),
-            )}
+            {(
+              ["pending", "paid", "shipped", "failed", "cancelled"] as const
+            ).map((status) => (
+              <li
+                key={status}
+                className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+              >
+                <span className="text-muted capitalize">{status}</span>
+                <span className="font-semibold tabular-nums">
+                  {data?.statuses[status] ?? 0}
+                </span>
+              </li>
+            ))}
           </ul>
         </section>
       </div>

@@ -1,6 +1,14 @@
-import { Ban, Loader2, Mail, MapPin, Truck } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Loader2,
+  Mail,
+  MapPin,
+  Truck,
+} from "lucide-react";
 import {
   COLLECTION_ADDRESS,
+  MANUAL_PAYMENT_METHOD_LABEL,
   formatCollectionAddress,
   type Order,
 } from "@/lib/admin/orders-types";
@@ -10,6 +18,7 @@ import AddNoteForm from "./AddNoteForm";
 
 interface OrderDetailViewProps {
   order: Order;
+  onMarkPaid?: () => void;
   onMarkShipped?: () => void;
   onCancel?: () => void;
   onResendReceipt?: () => Promise<void>;
@@ -54,12 +63,17 @@ function DetailList({ rows }: { rows: DetailRow[] }) {
 
 export default function OrderDetailView({
   order,
+  onMarkPaid,
   onMarkShipped,
   onCancel,
   onResendReceipt,
   onAddNote,
   mutating = false,
 }: OrderDetailViewProps) {
+  const canMarkPaid =
+    Boolean(onMarkPaid) &&
+    order.status === "pending" &&
+    order.source === "manual";
   const canMarkShipped = Boolean(onMarkShipped) && order.status === "paid";
   const canCancel = Boolean(onCancel) && order.status !== "cancelled";
   const canResendReceipt =
@@ -67,6 +81,7 @@ export default function OrderDetailView({
     (order.status === "paid" || order.status === "shipped");
 
   const isCollection = order.fulfilment === "collection";
+  const isDelivery = order.fulfilment === "delivery";
 
   const fulfilmentValue = isCollection ? (
     <span className="inline-flex items-center gap-1.5">
@@ -74,11 +89,13 @@ export default function OrderDetailView({
       Self-collection — {COLLECTION_ADDRESS.name},{" "}
       {COLLECTION_ADDRESS.line1}, {COLLECTION_ADDRESS.city}
     </span>
-  ) : (
+  ) : isDelivery ? (
     <span className="inline-flex items-center gap-1.5">
       <Truck size={14} className="text-foreground" aria-hidden />
       Delivery
     </span>
+  ) : (
+    <span className="text-muted">Not set yet — choose at Mark as Paid</span>
   );
 
   const customerRows: DetailRow[] = [
@@ -90,7 +107,11 @@ export default function OrderDetailView({
     { label: "Phone", value: order.customer.phone || "—" },
     { label: "Fulfilment", value: fulfilmentValue },
     {
-      label: isCollection ? "Collection point" : "Delivery address",
+      label: isCollection
+        ? "Collection point"
+        : isDelivery
+          ? "Delivery address"
+          : "Address",
       value: isCollection
         ? formatCollectionAddress()
         : [
@@ -110,6 +131,23 @@ export default function OrderDetailView({
   ];
 
   const paymentRows: DetailRow[] = [
+    {
+      label: "Source",
+      value:
+        order.source === "manual"
+          ? "Manual entry"
+          : order.source === "yoco"
+            ? "Yoco checkout"
+            : "—",
+    },
+    {
+      label: "Payment method",
+      value: order.manualPaymentMethod
+        ? MANUAL_PAYMENT_METHOD_LABEL[order.manualPaymentMethod]
+        : order.source === "yoco"
+          ? "Card / Yoco"
+          : "Not set yet",
+    },
     { label: "Checkout ID", value: order.yoco.checkoutId || "—" },
     { label: "Payment ID", value: order.yoco.paymentId ?? "—" },
     { label: "Failure reason", value: order.yoco.failureReason ?? "—" },
@@ -138,6 +176,21 @@ export default function OrderDetailView({
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <OrderStatusBadge status={order.status} />
           <div className="flex flex-wrap items-center gap-2">
+            {canMarkPaid ? (
+              <button
+                type="button"
+                onClick={onMarkPaid}
+                disabled={mutating}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {mutating ? (
+                  <Loader2 size={14} className="animate-spin" aria-hidden />
+                ) : (
+                  <CheckCircle2 size={14} aria-hidden />
+                )}
+                Mark as paid
+              </button>
+            ) : null}
             {canMarkShipped ? (
               <button
                 type="button"

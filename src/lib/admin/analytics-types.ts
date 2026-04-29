@@ -9,6 +9,7 @@ export interface PaymentBreakdown {
 }
 
 export interface StatusBreakdown {
+  pending: number;
   paid: number;
   failed: number;
   shipped: number;
@@ -78,17 +79,27 @@ export interface ManualSaleInput {
     email?: string;
   };
   items: ManualSaleItemInput[];
-  paymentMethod: "cash" | "card" | "eft";
-  fulfilment: "delivery" | "collection";
-  deliveryFee: number;
   notes?: string;
 }
 
 export interface ManualSaleResponse {
   id: string;
   ref: string;
-  total: number;
   subtotal: number;
+  total: number;
   shipping: number;
-  paymentMethod: "cash" | "card" | "eft";
+}
+
+export interface MarkPaidInput {
+  manualPaymentMethod: "cash" | "card" | "eft";
+  fulfilment: "delivery" | "collection";
+  deliveryFee?: number;
+}
+
+export interface MarkPaidResponse {
+  ok: true;
+  status: "paid";
+  manualPaymentMethod: "cash" | "card" | "eft";
+  fulfilment: "delivery" | "collection";
+  shipping: number;
 }

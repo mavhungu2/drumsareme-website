@@ -6,9 +6,6 @@ import {
   FieldValue,
   generateOrderRef,
   type Customer,
-  type Fulfilment,
-  type InventoryItem,
-  type ManualPaymentMethod,
   type Order,
   type OrderItem,
 } from "./lib/firestore";
@@ -16,22 +13,6 @@ import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 import { getServerProduct } from "./lib/products";
 
-const VALID_PAYMENTS: ReadonlyArray<ManualPaymentMethod> = [
-  "cash",
-  "card",
-  "eft",
-];
-
-class InsufficientStockError extends Error {
-  readonly productName: string;
-  readonly available: number;
-  constructor(productName: string, available: number) {
-    super(`Only ${available} of ${productName} in stock`);
-    this.name = "InsufficientStockError";
-    this.productName = productName;
-    this.available = available;
-  }
-}
 const MAX_NAME_LEN = 120;
 const MAX_PHONE_LEN = 30;
 const MAX_NOTES_LEN = 500;
@@ -49,9 +30,6 @@ interface ManualSaleInput {
     email?: string;
   };
   items: ManualSaleItemInput[];
-  paymentMethod: ManualPaymentMethod;
-  fulfilment: Fulfilment;
-  deliveryFee: number;
   notes?: string;
 }
 
@@ -97,25 +75,9 @@ function trimRequiredString(
 function validate(
   body: Record<string, unknown>,
 ): { ok: true; input: ManualSaleInput } | { ok: false; error: string } {
-  const {
-    customer,
-    items,
-    paymentMethod,
-    fulfilment: rawFulfilment,
-    deliveryFee,
-    notes,
-    ...extra
-  } = body;
+  const { customer, items, notes, ...extra } = body;
   if (Object.keys(extra).length > 0) {
     return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
-  }
-
-  let fulfilment: Fulfilment = "delivery";
-  if (rawFulfilment !== undefined) {
-    if (rawFulfilment !== "delivery" && rawFulfilment !== "collection") {
-      return { ok: false, error: "fulfilment must be 'delivery' or 'collection'" };
-    }
-    fulfilment = rawFulfilment;
   }
 
   if (!customer || typeof customer !== "object") {
@@ -167,35 +129,6 @@ function validate(
     cleanItems.push({ productId: it.productId.trim(), qty: it.qty });
   }
 
-  if (
-    typeof paymentMethod !== "string" ||
-    !VALID_PAYMENTS.includes(paymentMethod as ManualPaymentMethod)
-  ) {
-    return {
-      ok: false,
-      error: `paymentMethod must be one of ${VALID_PAYMENTS.join(", ")}`,
-    };
-  }
-
-  // Tolerate a missing or zero deliveryFee for collection orders.
-  let deliveryFeeClean = 0;
-  if (deliveryFee !== undefined) {
-    if (
-      typeof deliveryFee !== "number" ||
-      !Number.isFinite(deliveryFee) ||
-      deliveryFee < 0
-    ) {
-      return { ok: false, error: "deliveryFee must be a non-negative number" };
-    }
-    deliveryFeeClean = deliveryFee;
-  }
-  if (fulfilment === "collection" && deliveryFeeClean > 0) {
-    return {
-      ok: false,
-      error: "deliveryFee must be 0 for collection orders",
-    };
-  }
-
   let notesClean: string | undefined;
   if (notes !== undefined) {
     if (typeof notes !== "string") {
@@ -218,9 +151,6 @@ function validate(
         email,
       },
       items: cleanItems,
-      paymentMethod: paymentMethod as ManualPaymentMethod,
-      fulfilment,
-      deliveryFee: Math.round(deliveryFeeClean * 100) / 100,
       notes: notesClean,
     },
   };
@@ -261,7 +191,6 @@ async function createManualSale(
     });
     subtotal += lineTotal;
   }
-  const total = subtotal + input.deliveryFee;
 
   const ref = await generateOrderRef();
   const orderDoc = db.collection("orders").doc();
@@ -280,91 +209,36 @@ async function createManualSale(
     ...(input.notes ? { notes: input.notes } : {}),
   };
 
-  await db.runTransaction(async (tx) => {
-    const inventoryRefs = orderItems.map((item) => ({
-      ref: db.collection("inventory").doc(item.productId),
-      qty: item.qty,
-      name: item.name,
-    }));
-    const inventorySnaps = await Promise.all(
-      inventoryRefs.map(({ ref }) => tx.get(ref)),
-    );
-
-    // Reject the sale if any tracked SKU has insufficient stock. Untracked
-    // products fall through to the create-on-demand branch below.
-    for (let i = 0; i < inventorySnaps.length; i += 1) {
-      const snap = inventorySnaps[i];
-      if (!snap.exists) continue;
-      const item = snap.data() as InventoryItem;
-      const available = Math.max(
-        0,
-        (item.openingStock ?? 0) - (item.unitsSold ?? 0),
-      );
-      if (inventoryRefs[i].qty > available) {
-        throw new InsufficientStockError(
-          inventoryRefs[i].name,
-          available,
-        );
-      }
-    }
-
-    inventorySnaps.forEach((snap, i) => {
-      const { ref: invRef, qty, name } = inventoryRefs[i];
-      if (snap.exists) {
-        const item = snap.data() as InventoryItem;
-        const nextSold = (item.unitsSold ?? 0) + qty;
-        const nextStock = Math.max(0, item.openingStock - nextSold);
-        tx.update(invRef, {
-          unitsSold: nextSold,
-          currentStock: nextStock,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        tx.set(invRef, {
-          productId: invRef.id,
-          name,
-          openingStock: 0,
-          unitsSold: qty,
-          currentStock: 0,
-          reorderLevel: 0,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-    });
-
-    tx.set(orderDoc, {
-      ref,
-      status: "paid",
-      source: "manual",
-      manualPaymentMethod: input.paymentMethod,
-      fulfilment: input.fulfilment,
-      inventoryApplied: true,
-      items: orderItems,
-      subtotal,
-      shipping: input.deliveryFee,
-      total,
-      customer,
-      yoco: { checkoutId: "" },
-      createdAt: FieldValue.serverTimestamp(),
-      paidAt: FieldValue.serverTimestamp(),
-    });
+  // Pending draft: payment method, fulfilment, delivery fee, and the
+  // inventory decrement are all deferred to the Mark as Paid action on the
+  // order detail page.
+  await orderDoc.set({
+    ref,
+    status: "pending",
+    source: "manual",
+    inventoryApplied: false,
+    items: orderItems,
+    subtotal,
+    shipping: 0,
+    total: subtotal,
+    customer,
+    yoco: { checkoutId: "" },
+    createdAt: FieldValue.serverTimestamp(),
   });
 
-  logger.info("adminManualSales create", {
+  logger.info("adminManualSales create-pending", {
     uid: auth.uid,
     orderId: orderDoc.id,
     ref,
-    total,
-    paymentMethod: input.paymentMethod,
+    subtotal,
   });
 
   res.status(201).json({
     id: orderDoc.id,
     ref,
-    total,
     subtotal,
-    shipping: input.deliveryFee,
-    paymentMethod: input.paymentMethod,
+    total: subtotal,
+    shipping: 0,
   });
 }
 
@@ -390,20 +264,6 @@ export const adminManualSales = onRequest(
     try {
       await createManualSale(req, res, auth);
     } catch (err) {
-      if (err instanceof InsufficientStockError) {
-        logger.info("adminManualSales rejected — insufficient stock", {
-          uid: auth.uid,
-          product: err.productName,
-          available: err.available,
-        });
-        if (!res.headersSent) {
-          res.status(409).json({
-            error: err.message,
-            available: err.available,
-          });
-        }
-        return;
-      }
       logger.error("adminManualSales failed", {
         uid: auth.uid,
         err: String(err),
