@@ -15,6 +15,8 @@
       { "source": "/api/admin/expenses/**", "function": "adminExpenses" },
       { "source": "/api/admin/analytics", "function": "adminAnalytics" },
       { "source": "/api/admin/sales/manual", "function": "adminManualSales" },
+      { "source": "/api/admin/products", "function": "adminProducts" },
+      { "source": "/api/admin/products/**", "function": "adminProducts" },
       { "source": "/api/orders/**", "function": "getOrder" }
     ],
     "headers": [

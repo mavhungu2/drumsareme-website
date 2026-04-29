@@ -5,15 +5,17 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, Minus, Plus, ShoppingCart, Check } from "lucide-react";
 import { products, getProduct } from "@/lib/products";
+import { useLiveProduct } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
-  const product = getProduct(slug);
+  const baked = getProduct(slug);
+  const product = useLiveProduct(baked ?? products[0]);
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
-  if (!product) {
+  if (!baked) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
         <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>

@@ -78,6 +78,21 @@ export interface InventoryItem {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  size: string;
+  color: string;
+  price: number;
+  description: string;
+  features: string[];
+  image: string;
+  inStock: boolean;
+  sortOrder: number;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
 export type ExpenseType =
   | "materials"
   | "shipping"

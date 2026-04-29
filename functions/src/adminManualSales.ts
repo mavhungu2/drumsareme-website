@@ -205,7 +205,7 @@ async function createManualSale(
   const orderItems: OrderItem[] = [];
   let subtotal = 0;
   for (const it of input.items) {
-    const product = getServerProduct(it.productId);
+    const product = await getServerProduct(it.productId);
     if (!product) {
       res.status(400).json({ error: `Unknown product ${it.productId}` });
       return;

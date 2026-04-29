@@ -30,6 +30,12 @@ import type {
   ManualSaleInput,
   ManualSaleResponse,
 } from "./analytics-types";
+import type {
+  CreateProductInput,
+  ListProductsResponse,
+  ProductListItem,
+  UpdateProductInput,
+} from "./products-types";
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -378,4 +384,41 @@ export async function createManualSale(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function listProducts(): Promise<ListProductsResponse> {
+  const url = buildUrl("/api/admin/products");
+  return requestJson<ListProductsResponse>(url, { method: "GET" });
+}
+
+export async function createProduct(
+  input: CreateProductInput,
+): Promise<ProductListItem> {
+  const url = buildUrl("/api/admin/products");
+  return requestJson<ProductListItem>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProduct(
+  id: string,
+  input: UpdateProductInput,
+): Promise<ProductListItem> {
+  if (!id) throw new AdminApiError(400, "Missing product id");
+  const url = buildUrl(`/api/admin/products/${encodeURIComponent(id)}`);
+  return requestJson<ProductListItem>(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteProduct(
+  id: string,
+): Promise<{ ok: true; id: string }> {
+  if (!id) throw new AdminApiError(400, "Missing product id");
+  const url = buildUrl(`/api/admin/products/${encodeURIComponent(id)}`);
+  return requestJson<{ ok: true; id: string }>(url, { method: "DELETE" });
 }

@@ -86,10 +86,10 @@ interface UpsertInput {
   supplier?: string;
 }
 
-function validateUpsert(
+async function validateUpsert(
   body: Record<string, unknown>,
   productIdFromPath?: string,
-): { ok: true; input: UpsertInput } | { ok: false; error: string } {
+): Promise<{ ok: true; input: UpsertInput } | { ok: false; error: string }> {
   const {
     productId: rawProductId,
     openingStock,
@@ -107,7 +107,7 @@ function validateUpsert(
   if (!productId) {
     return { ok: false, error: "productId is required" };
   }
-  if (!getServerProduct(productId)) {
+  if (!(await getServerProduct(productId))) {
     return { ok: false, error: `Unknown productId: ${productId}` };
   }
 
@@ -152,14 +152,14 @@ async function upsertInventory(
     res.status(400).json({ error: parsed.error });
     return;
   }
-  const validated = validateUpsert(parsed.body, productIdFromPath);
+  const validated = await validateUpsert(parsed.body, productIdFromPath);
   if (!validated.ok) {
     res.status(400).json({ error: validated.error });
     return;
   }
   const { input } = validated;
 
-  const product = getServerProduct(input.productId)!;
+  const product = (await getServerProduct(input.productId))!;
   const docRef = db.collection("inventory").doc(input.productId);
 
   const result = await db.runTransaction(async (tx) => {

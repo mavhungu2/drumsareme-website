@@ -107,7 +107,7 @@ export const createCheckout = onRequest(
     const items: OrderItem[] = [];
     let subtotal = 0;
     for (const it of validated.items) {
-      const product = getServerProduct(it.id);
+      const product = await getServerProduct(it.id);
       if (!product) {
         res.status(400).json({ error: `Unknown product ${it.id}` });
         return;

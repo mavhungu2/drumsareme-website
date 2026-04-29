@@ -11,6 +11,7 @@ import {
   PlusCircle,
   Receipt,
   ShoppingBag,
+  Tag,
   TrendingUp,
   User as UserIcon,
   Users,
@@ -46,6 +47,12 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
     label: "Manual sale",
     icon: PlusCircle,
     match: (pathname) => pathname.startsWith("/admin/orders/manual"),
+  },
+  {
+    href: "/admin/products/",
+    label: "Products",
+    icon: Tag,
+    match: (pathname) => pathname.startsWith("/admin/products"),
   },
   {
     href: "/admin/inventory/",

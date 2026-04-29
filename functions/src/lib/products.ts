@@ -1,8 +1,13 @@
 /**
- * Server-side price catalog — the source of truth for /api/checkout.
- * Mirrors src/lib/products.ts but only the fields that affect payment.
- * Keep in sync when adding/renaming products.
+ * Server product catalog. Reads from the Firestore `products/{id}` collection
+ * with a short in-memory TTL cache so per-request reads stay cheap on warm
+ * function instances. Used by createCheckout, adminInventory, adminManualSales.
+ *
+ * Pricing and availability are sourced from Firestore so admin edits flow
+ * through to checkout without redeploying the customer-facing static export.
  */
+import { db, type Product } from "./firestore";
+
 export interface ServerProduct {
   id: string;
   name: string;
@@ -11,37 +16,51 @@ export interface ServerProduct {
 
 export const SHIPPING_FLAT_ZAR = 100;
 
-const catalogList: ServerProduct[] = [
-  // 7A
-  { id: "7a-natural", name: "Keep Time 7A - Natural", price: 150 },
-  { id: "7a-blue", name: "Keep Time 7A - Blue", price: 150 },
-  { id: "7a-green", name: "Keep Time 7A - Green", price: 150 },
-  { id: "7a-red", name: "Keep Time 7A - Red", price: 150 },
+const CACHE_TTL_MS = 30_000;
 
-  // 5A
-  { id: "5a-natural", name: "Keep Time 5A - Natural", price: 150 },
-  { id: "5a-black", name: "Keep Time 5A - Black", price: 150 },
-  { id: "5a-pink", name: "Keep Time 5A - Pink", price: 150 },
-  { id: "5a-blue", name: "Keep Time 5A - Blue", price: 150 },
-  { id: "5a-yellow", name: "Keep Time 5A - Yellow", price: 150 },
-  { id: "5a-silver-blade", name: "Keep Time 5A - Silver Blade", price: 180 },
+interface CacheEntry {
+  products: Map<string, ServerProduct>;
+  loadedAt: number;
+}
 
-  // 5B
-  { id: "5b-natural", name: "Keep Time 5B - Natural", price: 150 },
-  { id: "5b-black", name: "Keep Time 5B - Black", price: 150 },
+let cache: CacheEntry | null = null;
 
-  // EX5A
-  { id: "ex5a-natural", name: "Keep Time EX5A - Natural", price: 150 },
-  { id: "ex5a-black", name: "Keep Time EX5A - Black", price: 150 },
+async function loadCatalog(): Promise<Map<string, ServerProduct>> {
+  const snap = await db.collection("products").get();
+  const map = new Map<string, ServerProduct>();
+  snap.forEach((doc) => {
+    const data = doc.data() as Product;
+    map.set(doc.id, {
+      id: doc.id,
+      name: data.name,
+      price: data.price,
+    });
+  });
+  return map;
+}
 
-  // EX5B
-  { id: "ex5b-natural", name: "Keep Time EX5B - Natural", price: 150 },
-];
+async function getCatalog(): Promise<Map<string, ServerProduct>> {
+  if (cache && Date.now() - cache.loadedAt < CACHE_TTL_MS) {
+    return cache.products;
+  }
+  const products = await loadCatalog();
+  cache = { products, loadedAt: Date.now() };
+  return products;
+}
 
-const catalog = new Map<string, ServerProduct>(
-  catalogList.map((p) => [p.id, p]),
-);
-
-export function getServerProduct(id: string): ServerProduct | undefined {
+export async function getServerProduct(
+  id: string,
+): Promise<ServerProduct | undefined> {
+  const catalog = await getCatalog();
   return catalog.get(id);
+}
+
+export async function listServerProducts(): Promise<ServerProduct[]> {
+  const catalog = await getCatalog();
+  return [...catalog.values()];
+}
+
+/** Test/seed escape hatch — invalidate the in-process cache. */
+export function invalidateProductCache(): void {
+  cache = null;
 }

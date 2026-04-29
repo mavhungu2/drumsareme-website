@@ -44,7 +44,7 @@ const SUPPLIER = "Keep Time";
 async function main() {
   console.log(`Seeding ${SEED_ROWS.length} inventory rows…`);
   for (const row of SEED_ROWS) {
-    const product = getServerProduct(row.productId);
+    const product = await getServerProduct(row.productId);
     if (!product) {
       console.error(`SKIP ${row.productId}: not in catalog`);
       continue;

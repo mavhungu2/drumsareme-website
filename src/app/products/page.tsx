@@ -4,12 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { products, sizes, colors } from "@/lib/products";
+import { useLiveProducts } from "@/lib/use-live-products";
 
 export default function ProductsPage() {
+  const live = useLiveProducts(products);
   const [sizeFilter, setSizeFilter] = useState<string>("all");
   const [colorFilter, setColorFilter] = useState<string>("all");
 
-  const filtered = products.filter((p) => {
+  const filtered = live.filter((p) => {
+    if (!p.inStock) return false;
     if (sizeFilter !== "all" && p.size !== sizeFilter) return false;
     if (colorFilter !== "all" && p.color !== colorFilter) return false;
     return true;
