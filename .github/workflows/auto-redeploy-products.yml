@@ -1,0 +1,38 @@
+name: Auto-redeploy hosting on products change
+
+# Triggered by the productsAutoRedeploy Cloud Function whenever the Firestore
+# `products` collection is written. Re-bakes products.generated.json from
+# Firestore and redeploys hosting only — does NOT touch Cloud Functions or
+# Firestore rules, so it's quick (~2 min) and safe to run frequently.
+#
+# Concurrency: rapid product edits collapse into a single follow-up build
+# (queued runs replace the existing pending run instead of stacking).
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this redeploy was triggered (logs only)"
+        required: false
+        default: "manual"
+
+concurrency:
+  group: products-redeploy
+  cancel-in-progress: false
+
+jobs:
+  rebuild_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm run sync:products
+      - run: npm run build
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DRUMSAREME_WEBSITE }}
+          channelId: live
+          projectId: drumsareme-website
