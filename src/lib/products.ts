@@ -56,16 +56,16 @@ export function getProductsByColor(color: string): Product[] {
   return products.filter((p) => p.color === color);
 }
 
-export const sizes = ["7A", "5A", "5B", "EX5A", "EX5B"] as const;
-export const colors = [
-  "Natural",
-  "Black",
-  "Pink",
-  "Red",
-  "Green",
-  "Blue",
-  "Yellow",
-  "Silver Blade",
-] as const;
+// Filter pills are derived from the live catalog so adding a brand-new size
+// or colour (e.g. a Purple variant) automatically gets a filter pill — no
+// code change required. The order follows insertion order in
+// `products.generated.json` (which honours `sortOrder` from Firestore), which
+// keeps related sizes/colours grouped naturally.
+function uniqueOrdered<T>(values: ReadonlyArray<T>): readonly T[] {
+  return Array.from(new Set(values));
+}
+
+export const sizes = uniqueOrdered(products.map((p) => p.size));
+export const colors = uniqueOrdered(products.map((p) => p.color));
 
 export const SHIPPING_FLAT_ZAR = 100;
