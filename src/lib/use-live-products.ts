@@ -14,6 +14,10 @@ interface LiveOverlayEntry {
   description?: string;
   features?: string[];
   image?: string;
+  slug?: string;
+  size?: string;
+  color?: string;
+  sortOrder?: number;
 }
 
 type LiveOverlay = ReadonlyMap<string, LiveOverlayEntry>;
@@ -63,6 +67,10 @@ async function loadOverlay(): Promise<LiveOverlay> {
           description?: unknown;
           features?: unknown;
           image?: unknown;
+          slug?: unknown;
+          size?: unknown;
+          color?: unknown;
+          sortOrder?: unknown;
         };
         const price =
           typeof data.price === "number" && Number.isFinite(data.price)
@@ -86,6 +94,17 @@ async function loadOverlay(): Promise<LiveOverlay> {
         }
         if (typeof data.image === "string" && data.image.length > 0) {
           entry.image = data.image;
+        }
+        if (typeof data.slug === "string" && data.slug.length > 0) {
+          entry.slug = data.slug;
+        }
+        if (typeof data.size === "string") entry.size = data.size;
+        if (typeof data.color === "string") entry.color = data.color;
+        if (
+          typeof data.sortOrder === "number" &&
+          Number.isFinite(data.sortOrder)
+        ) {
+          entry.sortOrder = data.sortOrder;
         }
         map.set(doc.id, entry);
       });
@@ -157,4 +176,55 @@ export function useLiveProducts(items: ReadonlyArray<Product>): Product[] {
 export function useStock(productId: string): number | undefined {
   const overlay = useLiveOverlay();
   return overlay.get(productId)?.stock;
+}
+
+/**
+ * Returns the full catalog merged from the baked JSON plus any Firestore-only
+ * products (added in admin since the last static rebuild). Falls back to the
+ * baked list while the Firestore overlay is still loading. Used by the
+ * manual sale form so new SKUs appear in the dropdown without waiting for the
+ * auto-redeploy workflow to rebuild the storefront.
+ */
+export function useLiveCatalog(
+  baked: ReadonlyArray<Product>,
+): Product[] {
+  const overlay = useLiveOverlay();
+  return useMemo(() => {
+    const seen = new Set<string>();
+    const result: Product[] = [];
+    for (const p of baked) {
+      const live = overlay.get(p.id);
+      result.push(applyOverlay(p, live));
+      seen.add(p.id);
+    }
+    overlay.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      // Firestore-only product (admin added it after the last build). Need
+      // every Product field; if any is missing we skip rather than render a
+      // half-broken row.
+      if (
+        !entry.slug ||
+        !entry.name ||
+        entry.size === undefined ||
+        entry.color === undefined
+      ) {
+        return;
+      }
+      result.push({
+        id,
+        slug: entry.slug,
+        name: entry.name,
+        size: entry.size,
+        color: entry.color,
+        price: entry.price,
+        description: entry.description ?? "",
+        features: entry.features ?? [],
+        image: entry.image ?? "",
+        inStock: entry.inStock,
+      });
+    });
+    // Stable order: baked items keep their original order; new items append
+    // at the end sorted by sortOrder.
+    return result;
+  }, [overlay, baked]);
 }

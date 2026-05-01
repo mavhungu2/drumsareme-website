@@ -7,9 +7,12 @@ import {
   createManualSale,
 } from "@/lib/admin/api-client";
 import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
-import { products } from "@/lib/products";
-import { useLiveOverlay } from "@/lib/use-live-products";
+import { products as bakedProducts } from "@/lib/products";
+import { useLiveCatalog, useLiveOverlay } from "@/lib/use-live-products";
 import { formatZar } from "@/lib/admin/format";
+import CustomerPicker, {
+  type PickerCustomer,
+} from "./CustomerPicker";
 
 interface LineRow {
   rowId: string;
@@ -36,6 +39,9 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const emailId = useId();
   const notesId = useId();
 
+  // Live catalog merges baked products with Firestore so SKUs added via the
+  // admin UI appear in the dropdown without a redeploy.
+  const products = useLiveCatalog(bakedProducts);
   const defaultProductId = products[0]?.id ?? "";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -45,8 +51,24 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickedCustomer, setPickedCustomer] = useState<PickerCustomer | null>(
+    null,
+  );
 
   const overlay = useLiveOverlay();
+
+  const handlePickCustomer = useCallback(
+    (customer: PickerCustomer | null) => {
+      setPickedCustomer(customer);
+      if (customer) {
+        setFirstName(customer.firstName);
+        setLastName(customer.lastName);
+        setPhone(customer.phone);
+        setEmail(customer.email);
+      }
+    },
+    [],
+  );
 
   const subtotal = useMemo(() => {
     return rows.reduce((sum, row) => {
@@ -55,7 +77,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       if (!product || !Number.isFinite(qty) || qty <= 0) return sum;
       return sum + product.price * qty;
     }, 0);
-  }, [rows]);
+  }, [products, rows]);
 
   // Sum requested qty per productId so the same SKU appearing on multiple
   // rows is checked against the combined total (matches what the server
@@ -91,7 +113,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       }
     });
     return issues;
-  }, [overlay, requestedByProductId]);
+  }, [overlay, products, requestedByProductId]);
   const hasStockIssue = stockIssues.length > 0;
 
   const updateRow = (rowId: string, patch: Partial<LineRow>) => {
@@ -189,6 +211,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Customer</h2>
+        <CustomerPicker
+          selected={pickedCustomer}
+          onPick={handlePickCustomer}
+        />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label
             htmlFor={firstNameId}
@@ -199,7 +225,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               id={firstNameId}
               type="text"
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                if (pickedCustomer) setPickedCustomer(null);
+              }}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </label>
@@ -212,7 +241,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               id={lastNameId}
               type="text"
               value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              onChange={(e) => {
+                setLastName(e.target.value);
+                if (pickedCustomer) setPickedCustomer(null);
+              }}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </label>
@@ -225,7 +257,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               id={phoneId}
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (pickedCustomer) setPickedCustomer(null);
+              }}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </label>
@@ -238,7 +273,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
               id={emailId}
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (pickedCustomer) setPickedCustomer(null);
+              }}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           </label>

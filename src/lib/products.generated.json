@@ -116,21 +116,6 @@
     "sortOrder": 5
   },
   {
-    "id": "isaac",
-    "slug": "isaac",
-    "name": "Mpharalala",
-    "size": "0826092370",
-    "color": "mavhungu2@gmail.com",
-    "price": 123,
-    "description": "test",
-    "features": [
-      "test feature"
-    ],
-    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/isaac/1777506435799.png",
-    "inStock": true,
-    "sortOrder": 5
-  },
-  {
     "id": "5a-pink",
     "slug": "5a-pink",
     "name": "Keep Time 5A - Pink",
@@ -251,6 +236,26 @@
     "sortOrder": 11
   },
   {
+    "id": "5a-green",
+    "slug": "5a-green",
+    "name": "Keep Time 5A - Green",
+    "size": "5A",
+    "color": "Green",
+    "price": 150,
+    "description": "The classic 5A — the most popular drumstick size in the world. Crafted from premium American Hickory for a perfect balance of weight, response, and durability. Ideal for all genres and skill levels.",
+    "features": [
+      "American Hickory wood",
+      "Oval wood tip",
+      "Length: 406mm (16\")",
+      "Diameter: 14.4mm (.565\")",
+      "Balanced weight distribution",
+      "Smooth lacquer finish"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/5a-green/1777575073451.jpg",
+    "inStock": true,
+    "sortOrder": 12
+  },
+  {
     "id": "ex5a-natural",
     "slug": "ex5a-natural",
     "name": "Keep Time EX5A - Natural",
@@ -269,6 +274,26 @@
     "image": "/images/gallery/20260110_170225.jpg",
     "inStock": true,
     "sortOrder": 12
+  },
+  {
+    "id": "5a-red",
+    "slug": "5a-red",
+    "name": "Keep Time 5A - Red",
+    "size": "5A",
+    "color": "Red",
+    "price": 150,
+    "description": "The classic 5A — the most popular drumstick size in the world. Crafted from premium American Hickory for a perfect balance of weight, response, and durability. Ideal for all genres and skill levels.",
+    "features": [
+      "American Hickory wood",
+      "Oval wood tip",
+      "Length: 406mm (16\")",
+      "Diameter: 14.4mm (.565\")",
+      "Balanced weight distribution",
+      "Smooth lacquer finish"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/5a-red/1777575194452.jpg",
+    "inStock": true,
+    "sortOrder": 13
   },
   {
     "id": "ex5a-black",
