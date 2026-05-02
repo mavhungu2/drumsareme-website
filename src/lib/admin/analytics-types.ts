@@ -13,6 +13,7 @@ export interface StatusBreakdown {
   paid: number;
   failed: number;
   shipped: number;
+  completed: number;
   cancelled: number;
 }
 

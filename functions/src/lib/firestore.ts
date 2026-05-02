@@ -58,7 +58,13 @@ export const COLLECTION_ADDRESS = {
 
 export interface Order {
   ref: string;
-  status: "pending" | "paid" | "failed" | "shipped" | "cancelled";
+  status:
+    | "pending"
+    | "paid"
+    | "failed"
+    | "shipped"
+    | "completed"
+    | "cancelled";
   source?: OrderSource;
   manualPaymentMethod?: ManualPaymentMethod;
   fulfilment?: Fulfilment;
@@ -76,6 +82,7 @@ export interface Order {
   createdAt: FirebaseFirestore.Timestamp;
   paidAt?: FirebaseFirestore.Timestamp;
   shippedAt?: FirebaseFirestore.Timestamp;
+  completedAt?: FirebaseFirestore.Timestamp;
   cancelledAt?: FirebaseFirestore.Timestamp;
   receiptResendAt?: FirebaseFirestore.Timestamp;
   tracking?: OrderTracking;

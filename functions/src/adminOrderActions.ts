@@ -638,6 +638,40 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
   }
 };
 
+const adminMarkCompleted: Handler = async ({ res, uid, orderId }) => {
+  const orderRef = db.collection("orders").doc(orderId);
+  const snap = await orderRef.get();
+  if (!snap.exists) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const order = snap.data() as Order;
+
+  if (order.status === "completed") {
+    res.status(200).json({
+      already: true,
+      completedAt: order.completedAt
+        ? order.completedAt.toDate().toISOString()
+        : null,
+    });
+    return;
+  }
+  if (order.status !== "shipped") {
+    res.status(409).json({
+      error: `Cannot mark ${order.status} order as completed — must be shipped first`,
+    });
+    return;
+  }
+
+  await orderRef.update({
+    status: "completed",
+    completedAt: FieldValue.serverTimestamp(),
+  });
+
+  logger.info("adminOrderActions", { uid, action: "mark-completed", orderId });
+  res.status(200).json({ ok: true, status: "completed" });
+};
+
 const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   const orderRef = db.collection("orders").doc(orderId);
 
@@ -741,6 +775,16 @@ const ROUTES: Array<{
     subPath: "mark-paid",
     entries: [
       { method: "POST", action: "mark-paid", handler: adminMarkPaid },
+    ],
+  },
+  {
+    subPath: "mark-completed",
+    entries: [
+      {
+        method: "POST",
+        action: "mark-completed",
+        handler: adminMarkCompleted,
+      },
     ],
   },
   {

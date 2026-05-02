@@ -28,6 +28,8 @@ const FIREBASE_CONFIG = {
 };
 
 async function main() {
+  const outPath = resolve(__dirname, "..", "src", "lib", "products.generated.json");
+
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getFirestore(app);
   const snap = await getDocs(collection(db, "products"));
@@ -52,7 +54,21 @@ async function main() {
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const outPath = resolve(__dirname, "..", "src", "lib", "products.generated.json");
+  // Defensive: never wipe the existing catalog if the fetch returned nothing.
+  // A 0-product write would empty generateStaticParams and break the build.
+  if (products.length === 0) {
+    const { existsSync } = await import("node:fs");
+    if (existsSync(outPath)) {
+      console.warn(
+        "Firestore returned 0 products — keeping existing products.generated.json untouched.",
+      );
+      return;
+    }
+    throw new Error(
+      "Firestore returned 0 products and no existing JSON to preserve.",
+    );
+  }
+
   await writeFile(outPath, JSON.stringify(products, null, 2) + "\n", "utf8");
   console.log(`Wrote ${products.length} products to ${outPath}`);
 }

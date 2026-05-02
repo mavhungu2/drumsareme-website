@@ -9,6 +9,7 @@ const VALID_STATUSES: ReadonlyArray<Order["status"]> = [
   "paid",
   "failed",
   "shipped",
+  "completed",
   "cancelled",
 ];
 

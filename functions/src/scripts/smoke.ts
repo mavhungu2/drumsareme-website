@@ -98,6 +98,7 @@ async function probeUnauthenticated() {
     ["POST", "/api/admin/orders/anything/cancel"],
     ["POST", "/api/admin/orders/anything/mark-paid"],
     ["POST", "/api/admin/orders/anything/mark-shipped"],
+    ["POST", "/api/admin/orders/anything/mark-completed"],
     ["POST", "/api/admin/orders/anything/resend-receipt"],
     ["GET", "/api/admin/inventory"],
     ["PATCH", "/api/admin/inventory/anything"],

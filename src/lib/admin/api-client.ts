@@ -403,6 +403,20 @@ export async function markOrderPaid(
   });
 }
 
+export type MarkCompletedResponse =
+  | { ok: true; status: "completed" }
+  | { already: true; completedAt: string | null };
+
+export async function markCompleted(
+  id: string,
+): Promise<MarkCompletedResponse> {
+  if (!id) throw new AdminApiError(400, "Missing order id");
+  const url = buildUrl(
+    `/api/admin/orders/${encodeURIComponent(id)}/mark-completed`,
+  );
+  return requestJson<MarkCompletedResponse>(url, { method: "POST" });
+}
+
 export async function listProducts(): Promise<ListProductsResponse> {
   const url = buildUrl("/api/admin/products");
   return requestJson<ListProductsResponse>(url, { method: "GET" });

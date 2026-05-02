@@ -8,6 +8,7 @@ import {
   AdminApiError,
   addNote,
   getOrder,
+  markCompleted,
   resendReceipt,
 } from "@/lib/admin/api-client";
 import type { Order } from "@/lib/admin/orders-types";
@@ -175,6 +176,31 @@ function OrderDetailContent() {
     }
   }, [refetch]);
 
+  const handleMarkCompleted = useCallback(async () => {
+    if (!id) return;
+    if (!window.confirm("Mark this order as completed? This indicates delivery has been confirmed.")) return;
+    setMutating(true);
+    setMutationBanner(null);
+    try {
+      await markCompleted(id);
+      await refetch();
+      setMutationBanner({
+        kind: "success",
+        message: "Order marked as completed.",
+      });
+    } catch (err) {
+      const message =
+        err instanceof AdminApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to mark as completed";
+      setMutationBanner({ kind: "error", message });
+    } finally {
+      setMutating(false);
+    }
+  }, [id, refetch]);
+
   const handleResendReceipt = useCallback(async () => {
     if (!id) return;
     if (!window.confirm("Resend receipt email to customer?")) return;
@@ -251,6 +277,7 @@ function OrderDetailContent() {
         mutating={mutating}
         onMarkPaid={() => setPaidDialogOpen(true)}
         onMarkShipped={() => setShipDialogOpen(true)}
+        onMarkCompleted={handleMarkCompleted}
         onCancel={() => setCancelDialogOpen(true)}
         onResendReceipt={handleResendReceipt}
         onAddNote={handleAddNote}

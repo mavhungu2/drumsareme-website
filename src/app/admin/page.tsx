@@ -131,7 +131,14 @@ export default function AdminDashboardPage() {
           </h2>
           <ul className="space-y-2 text-sm">
             {(
-              ["pending", "paid", "shipped", "failed", "cancelled"] as const
+              [
+                "pending",
+                "paid",
+                "shipped",
+                "completed",
+                "failed",
+                "cancelled",
+              ] as const
             ).map((status) => (
               <li
                 key={status}

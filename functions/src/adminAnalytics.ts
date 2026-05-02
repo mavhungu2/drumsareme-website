@@ -24,6 +24,7 @@ interface StatusBreakdown {
   paid: number;
   failed: number;
   shipped: number;
+  completed: number;
   cancelled: number;
 }
 
@@ -143,6 +144,7 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
     paid: 0,
     failed: 0,
     shipped: 0,
+    completed: 0,
     cancelled: 0,
   };
   const productMap = new Map<string, ProductPerformance>();
@@ -163,7 +165,9 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
     totalOrders += 1;
 
     const isRevenue =
-      order.status === "paid" || order.status === "shipped";
+      order.status === "paid" ||
+      order.status === "shipped" ||
+      order.status === "completed";
     if (!isRevenue) return;
     paidOrders += 1;
 

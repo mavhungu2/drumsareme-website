@@ -42,5 +42,6 @@ export const ORDER_STATUS_CLASSES: Readonly<Record<OrderStatus, string>> = {
   paid: "bg-green-light/20 text-green border-green/30",
   failed: "bg-red-100 text-red-800 border-red-200",
   shipped: "bg-blue-100 text-blue-800 border-blue-200",
+  completed: "bg-green text-white border-green",
   cancelled: "bg-gray-100 text-gray-700 border-gray-200",
 };

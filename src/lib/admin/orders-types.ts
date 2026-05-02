@@ -10,6 +10,7 @@ export type OrderStatus =
   | "paid"
   | "failed"
   | "shipped"
+  | "completed"
   | "cancelled";
 
 export type OrderSource = "yoco" | "manual";
@@ -91,6 +92,7 @@ export interface Order {
   createdAt: string;
   paidAt?: string;
   shippedAt?: string;
+  completedAt?: string;
   cancelledAt?: string;
   tracking?: OrderTracking;
   notes?: OrderNote[];
@@ -129,6 +131,7 @@ export const ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
   "paid",
   "failed",
   "shipped",
+  "completed",
   "cancelled",
 ];
 
@@ -137,5 +140,6 @@ export const ORDER_STATUS_LABEL: Readonly<Record<OrderStatus, string>> = {
   paid: "Paid",
   failed: "Failed",
   shipped: "Shipped",
+  completed: "Completed",
   cancelled: "Cancelled",
 };

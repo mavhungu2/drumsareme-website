@@ -12,7 +12,7 @@ const featuredProducts = [
   {
     name: "5A Silver Blade",
     slug: "5a-silver-blade",
-    image: "/images/gallery/20260110_170349.jpg",
+    image: "/images/gallery/5a-silver-blade.jpg",
     tag: "Premium",
   },
   {

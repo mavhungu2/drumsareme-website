@@ -20,6 +20,7 @@ interface OrderDetailViewProps {
   order: Order;
   onMarkPaid?: () => void;
   onMarkShipped?: () => void;
+  onMarkCompleted?: () => Promise<void>;
   onCancel?: () => void;
   onResendReceipt?: () => Promise<void>;
   onAddNote?: (body: string) => Promise<void>;
@@ -65,6 +66,7 @@ export default function OrderDetailView({
   order,
   onMarkPaid,
   onMarkShipped,
+  onMarkCompleted,
   onCancel,
   onResendReceipt,
   onAddNote,
@@ -75,10 +77,17 @@ export default function OrderDetailView({
     order.status === "pending" &&
     order.source === "manual";
   const canMarkShipped = Boolean(onMarkShipped) && order.status === "paid";
-  const canCancel = Boolean(onCancel) && order.status !== "cancelled";
+  const canMarkCompleted =
+    Boolean(onMarkCompleted) && order.status === "shipped";
+  const canCancel =
+    Boolean(onCancel) &&
+    order.status !== "cancelled" &&
+    order.status !== "completed";
   const canResendReceipt =
     Boolean(onResendReceipt) &&
-    (order.status === "paid" || order.status === "shipped");
+    (order.status === "paid" ||
+      order.status === "shipped" ||
+      order.status === "completed");
 
   const isCollection = order.fulfilment === "collection";
   const isDelivery = order.fulfilment === "delivery";
@@ -158,6 +167,7 @@ export default function OrderDetailView({
     { label: "Created", value: formatDateTime(order.createdAt) },
     { label: "Paid", value: formatDateTime(order.paidAt) },
     { label: "Shipped", value: formatDateTime(order.shippedAt) },
+    { label: "Completed", value: formatDateTime(order.completedAt) },
     { label: "Cancelled", value: formatDateTime(order.cancelledAt) },
   ];
 
@@ -204,6 +214,21 @@ export default function OrderDetailView({
                   <Truck size={14} aria-hidden />
                 )}
                 Mark as shipped
+              </button>
+            ) : null}
+            {canMarkCompleted ? (
+              <button
+                type="button"
+                onClick={onMarkCompleted}
+                disabled={mutating}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {mutating ? (
+                  <Loader2 size={14} className="animate-spin" aria-hidden />
+                ) : (
+                  <CheckCircle2 size={14} aria-hidden />
+                )}
+                Mark as completed
               </button>
             ) : null}
             {canResendReceipt ? (
