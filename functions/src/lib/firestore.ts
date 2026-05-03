@@ -132,10 +132,6 @@ export interface Expense {
 }
 
 export async function generateOrderRef(): Promise<string> {
-  const yyyymmdd = new Date()
-    .toISOString()
-    .slice(0, 10)
-    .replace(/-/g, "");
   const counterRef = db.doc("counters/orders");
   const seq = await db.runTransaction(async (tx) => {
     const snap = await tx.get(counterRef);
@@ -144,5 +140,5 @@ export async function generateOrderRef(): Promise<string> {
     tx.set(counterRef, { seq: next }, { merge: true });
     return next;
   });
-  return `KT-${yyyymmdd}-${String(seq).padStart(4, "0")}`;
+  return `KT-${String(seq).padStart(4, "0")}`;
 }
