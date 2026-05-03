@@ -15,6 +15,21 @@ const isPaid = (order: Order) =>
   order.status === "shipped" ||
   order.status === "completed";
 
+const CANCEL_NOTE_PREFIX = "Order cancelled:";
+
+function findCancellationReason(order: Order): string | undefined {
+  if (!order.notes) return undefined;
+  // Most recent cancellation note wins. Notes are appended in chronological
+  // order so reverse iterate.
+  for (let i = order.notes.length - 1; i >= 0; i -= 1) {
+    const body = order.notes[i]?.body ?? "";
+    if (body.startsWith(CANCEL_NOTE_PREFIX)) {
+      return body.slice(CANCEL_NOTE_PREFIX.length).trim();
+    }
+  }
+  return undefined;
+}
+
 function formatCustomerAddress(order: Order): string[] {
   // Collection orders show the collection address in the right column;
   // BILL TO keeps just the customer's contact details to avoid duplication.
@@ -36,6 +51,7 @@ function formatCustomerAddress(order: Order): string[] {
 export default function Invoice({ order }: InvoiceProps) {
   const paid = isPaid(order);
   const cancelled = order.status === "cancelled";
+  const cancellationReason = cancelled ? findCancellationReason(order) : undefined;
   const customerAddress = formatCustomerAddress(order);
 
   return (
@@ -89,6 +105,24 @@ export default function Invoice({ order }: InvoiceProps) {
           </p>
         </div>
       </header>
+
+      {cancelled && (
+        <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm">
+          <p className="font-semibold text-red-900">
+            This order has been cancelled
+            {order.cancelledAt ? ` on ${formatDate(order.cancelledAt)}` : ""}.
+          </p>
+          {cancellationReason && (
+            <p className="mt-1 text-red-800">
+              <span className="font-medium">Reason:</span> {cancellationReason}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-red-800">
+            No payment is due. If a payment was already made, a refund will
+            be issued via the original payment channel.
+          </p>
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-6 mt-6 text-sm">
         <div>
@@ -193,7 +227,13 @@ export default function Invoice({ order }: InvoiceProps) {
             </span>
           </div>
           <div className="flex justify-between border-t border-gray-300 pt-2 mt-2 text-base font-bold">
-            <span>Total {paid ? "paid" : "due"}</span>
+            <span>
+              {cancelled
+                ? "Order total"
+                : paid
+                  ? "Total paid"
+                  : "Total due"}
+            </span>
             <span className="tabular-nums">{formatZar(order.total)}</span>
           </div>
         </div>

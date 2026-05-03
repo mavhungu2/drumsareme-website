@@ -56,6 +56,20 @@ function isPaid(order: Order): boolean {
   );
 }
 
+const CANCEL_NOTE_PREFIX = "Order cancelled:";
+
+function findCancellationReason(order: Order): string | undefined {
+  const notes = order.notes;
+  if (!notes) return undefined;
+  for (let i = notes.length - 1; i >= 0; i -= 1) {
+    const body = notes[i]?.body ?? "";
+    if (body.startsWith(CANCEL_NOTE_PREFIX)) {
+      return body.slice(CANCEL_NOTE_PREFIX.length).trim();
+    }
+  }
+  return undefined;
+}
+
 function formatZAR(value: number): string {
   return `R${value.toLocaleString("en-ZA", {
     minimumFractionDigits: 2,
@@ -193,6 +207,52 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
       .lineWidth(1)
       .stroke();
     doc.moveDown(1);
+
+    // === Cancelled banner ===
+    if (cancelled) {
+      const cancelReason = findCancellationReason(order);
+      const bannerY = doc.y;
+      const reasonLine = cancelReason ? `Reason: ${cancelReason}` : "";
+      const noteLine =
+        "No payment is due. If a payment was already made, a refund will be issued via the original payment channel.";
+      const bannerHeight = reasonLine ? 76 : 56;
+      doc
+        .rect(leftX, bannerY, pageWidth, bannerHeight)
+        .fillColor("#fef2f2")
+        .fill();
+      doc
+        .strokeColor("#fecaca")
+        .lineWidth(1)
+        .rect(leftX, bannerY, pageWidth, bannerHeight)
+        .stroke();
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .fillColor("#991b1b")
+        .text(
+          `This order has been cancelled${
+            order.cancelledAt ? ` on ${formatDate(order.cancelledAt)}` : ""
+          }.`,
+          leftX + 12,
+          bannerY + 10,
+          { width: pageWidth - 24 },
+        );
+      if (reasonLine) {
+        doc
+          .font("Helvetica")
+          .fontSize(10)
+          .fillColor("#7f1d1d")
+          .text(reasonLine, leftX + 12, doc.y + 2, {
+            width: pageWidth - 24,
+          });
+      }
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor("#7f1d1d")
+        .text(noteLine, leftX + 12, doc.y + 4, { width: pageWidth - 24 });
+      doc.y = bannerY + bannerHeight + 12;
+    }
 
     // === Bill to + fulfilment ===
     const colWidth = pageWidth / 2 - 10;
@@ -391,7 +451,11 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
       .font("Helvetica-Bold")
       .fontSize(12)
       .fillColor("#0a0a0a")
-      .text(paid ? "Total paid" : "Total due", totalsLabelX, tY);
+      .text(
+        cancelled ? "Order total" : paid ? "Total paid" : "Total due",
+        totalsLabelX,
+        tY,
+      );
     doc.text(formatZAR(order.total), totalsValueX, tY, {
       width: totalsValueWidth,
       align: "right",
