@@ -35,12 +35,19 @@ interface ManualSaleInput {
     lastName: string;
     phone: string;
     email?: string;
+    addressLine1?: string;
+    suburb?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
   };
   items: ManualSaleItemInput[];
   fulfilment: Fulfilment;
   deliveryFee: number;
   notes?: string;
 }
+
+const MAX_ADDRESS_LEN = 200;
 
 function parseJsonBody(
   req: Request,
@@ -150,6 +157,40 @@ function validate(
     }
   }
 
+  const addressFields = ["addressLine1", "suburb", "city", "province", "postalCode"] as const;
+  type AddressKey = (typeof addressFields)[number];
+  const cleanedAddress: Partial<Record<AddressKey, string>> = {};
+  for (const key of addressFields) {
+    const raw = (c as Record<string, unknown>)[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "string") {
+      return { ok: false, error: `${key} must be a string` };
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) continue;
+    if (trimmed.length > MAX_ADDRESS_LEN) {
+      return { ok: false, error: `${key} too long` };
+    }
+    cleanedAddress[key] = trimmed;
+  }
+
+  if (fulfilment === "delivery") {
+    const required: AddressKey[] = [
+      "addressLine1",
+      "city",
+      "province",
+      "postalCode",
+    ];
+    for (const key of required) {
+      if (!cleanedAddress[key]) {
+        return {
+          ok: false,
+          error: `${key} is required for delivery orders`,
+        };
+      }
+    }
+  }
+
   if (!Array.isArray(items) || items.length === 0) {
     return { ok: false, error: "At least one item is required" };
   }
@@ -194,6 +235,7 @@ function validate(
         lastName: lastName.value,
         phone: phone.value,
         email,
+        ...cleanedAddress,
       },
       items: cleanItems,
       fulfilment,
@@ -275,10 +317,11 @@ async function createManualSale(
     lastName: input.customer.lastName,
     email: input.customer.email ?? "",
     phone: input.customer.phone,
-    addressLine1: "",
-    city: "",
-    province: "",
-    postalCode: "",
+    addressLine1: input.customer.addressLine1 ?? "",
+    city: input.customer.city ?? "",
+    province: input.customer.province ?? "",
+    postalCode: input.customer.postalCode ?? "",
+    ...(input.customer.suburb ? { suburb: input.customer.suburb } : {}),
     ...(input.notes ? { notes: input.notes } : {}),
   };
 

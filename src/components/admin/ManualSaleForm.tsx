@@ -58,6 +58,11 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [suburb, setSuburb] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
@@ -181,6 +186,17 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         return setError("Delivery fee must be a non-negative number.");
       }
 
+      const addressLine1Trim = addressLine1.trim();
+      const cityTrim = city.trim();
+      const provinceTrim = province.trim();
+      const postalCodeTrim = postalCode.trim();
+      if (fulfilment === "delivery") {
+        if (!addressLine1Trim) return setError("Street address is required for delivery.");
+        if (!cityTrim) return setError("City is required for delivery.");
+        if (!provinceTrim) return setError("Province is required for delivery.");
+        if (!postalCodeTrim) return setError("Postal code is required for delivery.");
+      }
+
       setSubmitting(true);
       setError(null);
       try {
@@ -190,6 +206,15 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
             lastName: ln,
             phone: ph,
             email: email.trim() || undefined,
+            ...(fulfilment === "delivery"
+              ? {
+                  addressLine1: addressLine1Trim,
+                  suburb: suburb.trim() || undefined,
+                  city: cityTrim,
+                  province: provinceTrim,
+                  postalCode: postalCodeTrim,
+                }
+              : {}),
           },
           items,
           fulfilment,
@@ -210,6 +235,8 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       }
     },
     [
+      addressLine1,
+      city,
       deliveryFee,
       email,
       firstName,
@@ -218,9 +245,12 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       notes,
       onSubmitted,
       phone,
+      postalCode,
       products,
+      province,
       rows,
       stockIssues,
+      suburb,
     ],
   );
 
@@ -467,17 +497,68 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           </label>
         </div>
         {fulfilment === "delivery" && (
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
-            <span>Delivery fee (ZAR)</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={deliveryFeeInput}
-              onChange={(e) => setDeliveryFeeInput(e.target.value)}
-              className="h-10 max-w-xs rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            />
-          </label>
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="sm:col-span-2 flex flex-col gap-1 text-xs font-medium text-muted">
+                <span>Street address</span>
+                <input
+                  type="text"
+                  value={addressLine1}
+                  onChange={(e) => setAddressLine1(e.target.value)}
+                  placeholder="123 Example Rd"
+                  className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+                <span>Suburb (optional)</span>
+                <input
+                  type="text"
+                  value={suburb}
+                  onChange={(e) => setSuburb(e.target.value)}
+                  className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+                <span>City</span>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+                <span>Province</span>
+                <input
+                  type="text"
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                  placeholder="GP / WC / KZN…"
+                  className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+                <span>Postal code</span>
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                />
+              </label>
+            </div>
+            <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+              <span>Delivery fee (ZAR)</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={deliveryFeeInput}
+                onChange={(e) => setDeliveryFeeInput(e.target.value)}
+                className="h-10 max-w-xs rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            </label>
+          </>
         )}
       </section>
 

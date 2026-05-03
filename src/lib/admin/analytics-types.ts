@@ -78,6 +78,11 @@ export interface ManualSaleInput {
     lastName: string;
     phone: string;
     email?: string;
+    addressLine1?: string;
+    suburb?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
   };
   items: ManualSaleItemInput[];
   fulfilment: "delivery" | "collection";
