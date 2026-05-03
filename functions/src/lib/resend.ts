@@ -131,7 +131,7 @@ function trackingHtml(tracking: OrderTracking): string {
 export async function sendShippingConfirmation(
   apiKey: string,
   order: Order,
-  tracking: OrderTracking,
+  tracking?: OrderTracking,
 ): Promise<void> {
   const isCollection = order.fulfilment === "collection";
   const subject = isCollection
@@ -140,13 +140,12 @@ export async function sendShippingConfirmation(
   const intro = isCollection
     ? "Your order is ready to collect"
     : "Your order is on its way";
-  // Tracking fields are still captured (admin records who handed it over for
-  // collection too) but we don't render the courier-style tracking block on
-  // a collection email — the address is already in the body via
-  // fulfilmentBlockHtml.
-  const body = isCollection
-    ? orderBodyHtml(order, intro)
-    : `${orderBodyHtml(order, intro)}${trackingHtml(tracking)}`;
+  // Collection emails skip the courier-style tracking block — the pickup
+  // address is already rendered in the body via fulfilmentBlockHtml.
+  const body =
+    !isCollection && tracking
+      ? `${orderBodyHtml(order, intro)}${trackingHtml(tracking)}`
+      : orderBodyHtml(order, intro);
   const resend = new Resend(apiKey);
   const attachments = await buildPdfAttachment(order, true);
   await resend.emails.send({

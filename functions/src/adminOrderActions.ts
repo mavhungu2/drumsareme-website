@@ -574,15 +574,23 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
       });
 
       const total = (order.subtotal ?? 0) + input.deliveryFee;
-      tx.update(orderRef, {
-        status: "paid",
+      // Collection orders skip the "shipped" step — the moment the customer
+      // pays the goods are ready at Spring Glade. Stamp shippedAt alongside
+      // paidAt so the timeline reflects both events.
+      const isCollection = input.fulfilment === "collection";
+      const transitionUpdates: Record<string, unknown> = {
+        status: isCollection ? "shipped" : "paid",
         paidAt: FieldValue.serverTimestamp(),
         manualPaymentMethod: input.manualPaymentMethod,
         fulfilment: input.fulfilment,
         shipping: input.deliveryFee,
         total,
         inventoryApplied: true,
-      });
+      };
+      if (isCollection) {
+        transitionUpdates.shippedAt = FieldValue.serverTimestamp();
+      }
+      tx.update(orderRef, transitionUpdates);
 
       return { kind: "ok" };
     });
@@ -612,9 +620,31 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
       fulfilment: input.fulfilment,
       deliveryFee: input.deliveryFee,
     });
+
+    // Collection orders auto-advance to "shipped" (= ready to collect) at
+    // mark-paid time. Fire the ready-to-collect email so the customer knows
+    // their order is waiting at Spring Glade.
+    const finalStatus =
+      input.fulfilment === "collection" ? "shipped" : "paid";
+    if (input.fulfilment === "collection") {
+      try {
+        const fresh = await orderRef.get();
+        if (fresh.exists && fresh.data()?.customer?.email) {
+          const updated = fresh.data() as Order;
+          await sendShippingConfirmation(RESEND_API_KEY.value(), updated);
+        }
+      } catch (err) {
+        logger.error("Ready-to-collect email failed", {
+          uid,
+          orderId,
+          err: String(err),
+        });
+      }
+    }
+
     res.status(200).json({
       ok: true,
-      status: "paid",
+      status: finalStatus,
       manualPaymentMethod: input.manualPaymentMethod,
       fulfilment: input.fulfilment,
       shipping: input.deliveryFee,
