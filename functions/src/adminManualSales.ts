@@ -174,23 +174,6 @@ function validate(
     cleanedAddress[key] = trimmed;
   }
 
-  if (fulfilment === "delivery") {
-    const required: AddressKey[] = [
-      "addressLine1",
-      "city",
-      "province",
-      "postalCode",
-    ];
-    for (const key of required) {
-      if (!cleanedAddress[key]) {
-        return {
-          ok: false,
-          error: `${key} is required for delivery orders`,
-        };
-      }
-    }
-  }
-
   if (!Array.isArray(items) || items.length === 0) {
     return { ok: false, error: "At least one item is required" };
   }

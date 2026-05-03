@@ -190,12 +190,6 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       const cityTrim = city.trim();
       const provinceTrim = province.trim();
       const postalCodeTrim = postalCode.trim();
-      if (fulfilment === "delivery") {
-        if (!addressLine1Trim) return setError("Street address is required for delivery.");
-        if (!cityTrim) return setError("City is required for delivery.");
-        if (!provinceTrim) return setError("Province is required for delivery.");
-        if (!postalCodeTrim) return setError("Postal code is required for delivery.");
-      }
 
       setSubmitting(true);
       setError(null);
@@ -208,11 +202,11 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
             email: email.trim() || undefined,
             ...(fulfilment === "delivery"
               ? {
-                  addressLine1: addressLine1Trim,
-                  suburb: suburb.trim() || undefined,
-                  city: cityTrim,
-                  province: provinceTrim,
-                  postalCode: postalCodeTrim,
+                  ...(addressLine1Trim ? { addressLine1: addressLine1Trim } : {}),
+                  ...(suburb.trim() ? { suburb: suburb.trim() } : {}),
+                  ...(cityTrim ? { city: cityTrim } : {}),
+                  ...(provinceTrim ? { province: provinceTrim } : {}),
+                  ...(postalCodeTrim ? { postalCode: postalCodeTrim } : {}),
                 }
               : {}),
           },
@@ -500,7 +494,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2 flex flex-col gap-1 text-xs font-medium text-muted">
-                <span>Street address</span>
+                <span>Street address (optional)</span>
                 <input
                   type="text"
                   value={addressLine1}
@@ -519,7 +513,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-muted">
-                <span>City</span>
+                <span>City (optional)</span>
                 <input
                   type="text"
                   value={city}
@@ -528,7 +522,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-muted">
-                <span>Province</span>
+                <span>Province (optional)</span>
                 <input
                   type="text"
                   value={province}
@@ -538,7 +532,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-muted">
-                <span>Postal code</span>
+                <span>Postal code (optional)</span>
                 <input
                   type="text"
                   value={postalCode}
