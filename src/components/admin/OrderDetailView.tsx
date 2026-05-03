@@ -1,6 +1,8 @@
+import Link from "next/link";
 import {
   Ban,
   CheckCircle2,
+  FileText,
   Loader2,
   Mail,
   MapPin,
@@ -232,6 +234,19 @@ export default function OrderDetailView({
                 )}
                 Mark as completed
               </button>
+            ) : null}
+            {order.status !== "cancelled" ? (
+              <Link
+                href={`/admin/orders/invoice/?id=${encodeURIComponent(order.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <FileText size={14} aria-hidden />
+                {order.status === "pending"
+                  ? "Download invoice"
+                  : "Download receipt"}
+              </Link>
             ) : null}
             {canResendReceipt ? (
               <button

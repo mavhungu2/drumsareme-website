@@ -53,3 +53,30 @@ body {
 .animate-delay-200 { animation-delay: 0.2s; }
 .animate-delay-300 { animation-delay: 0.3s; }
 .animate-delay-400 { animation-delay: 0.4s; }
+
+/*
+ * Print rules for the admin invoice page. AdminShell sidebar/header use
+ * `print:hidden` (Tailwind) directly. These rules clean up colours, page
+ * size, and any leftover chrome.
+ */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  .invoice-page {
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .invoice-doc {
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    max-width: 210mm !important;
+    padding: 12mm !important;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

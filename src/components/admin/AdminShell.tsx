@@ -118,7 +118,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className="hidden md:flex md:w-60 lg:w-64 shrink-0 flex-col bg-surface border-r border-border">
+      <aside className="hidden md:flex md:w-60 lg:w-64 shrink-0 flex-col bg-surface border-r border-border print:hidden">
         <div className="h-16 px-6 flex items-center border-b border-border">
           <span className="font-semibold tracking-tight text-foreground">
             Admin
@@ -165,7 +165,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden h-14 px-4 flex items-center justify-between border-b border-border bg-surface">
+        <header className="md:hidden h-14 px-4 flex items-center justify-between border-b border-border bg-surface print:hidden">
           <span className="font-semibold tracking-tight text-foreground">
             Admin
           </span>
