@@ -235,19 +235,19 @@ export default function OrderDetailView({
                 Mark as completed
               </button>
             ) : null}
-            {order.status !== "cancelled" ? (
-              <Link
-                href={`/admin/orders/invoice/?id=${encodeURIComponent(order.id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <FileText size={14} aria-hidden />
-                {order.status === "pending"
-                  ? "Download invoice"
+            <Link
+              href={`/admin/orders/invoice/?id=${encodeURIComponent(order.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <FileText size={14} aria-hidden />
+              {order.status === "pending"
+                ? "Download invoice"
+                : order.status === "cancelled"
+                  ? "Download cancellation"
                   : "Download receipt"}
-              </Link>
-            ) : null}
+            </Link>
             {canResendReceipt ? (
               <button
                 type="button"
