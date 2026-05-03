@@ -1,5 +1,22 @@
 import { Resend } from "resend";
 import { COLLECTION_ADDRESS, type Order, type OrderTracking } from "./firestore";
+import { generateInvoicePdf } from "./invoicePdf";
+
+async function buildPdfAttachment(order: Order, paid: boolean) {
+  try {
+    const pdf = await generateInvoicePdf(order);
+    return [
+      {
+        filename: `${paid ? "Receipt" : "Invoice"}-${order.ref}.pdf`,
+        content: pdf.toString("base64"),
+      },
+    ];
+  } catch {
+    // PDF generation must never block the email — log nothing here
+    // (caller's logger has more context) and just send without attachment.
+    return undefined;
+  }
+}
 
 const FROM = "DrumsAreMe <orders@drumsareme.co.za>";
 
@@ -74,11 +91,13 @@ export async function sendCustomerReceipt(
   order: Order,
 ): Promise<void> {
   const resend = new Resend(apiKey);
+  const attachments = await buildPdfAttachment(order, true);
   await resend.emails.send({
     from: FROM,
     to: order.customer.email,
     subject: `Order ${order.ref} confirmed — thanks for your order!`,
     html: orderBodyHtml(order, "Thanks, your order is confirmed"),
+    attachments,
   });
 }
 
@@ -88,11 +107,13 @@ export async function sendMerchantNotification(
   order: Order,
 ): Promise<void> {
   const resend = new Resend(apiKey);
+  const attachments = await buildPdfAttachment(order, true);
   await resend.emails.send({
     from: FROM,
     to: merchantEmail,
     subject: `New paid order ${order.ref} — ${formatZAR(order.total)}`,
     html: orderBodyHtml(order, "New paid order"),
+    attachments,
   });
 }
 
@@ -127,11 +148,13 @@ export async function sendShippingConfirmation(
     ? orderBodyHtml(order, intro)
     : `${orderBodyHtml(order, intro)}${trackingHtml(tracking)}`;
   const resend = new Resend(apiKey);
+  const attachments = await buildPdfAttachment(order, true);
   await resend.emails.send({
     from: FROM,
     to: order.customer.email,
     subject,
     html: body,
+    attachments,
   });
 }
 
@@ -159,10 +182,12 @@ export async function sendCancellationNotification(
   reason: string,
 ): Promise<void> {
   const resend = new Resend(apiKey);
+  const attachments = await buildPdfAttachment(order, false);
   await resend.emails.send({
     from: FROM,
     to: order.customer.email,
     subject: `Order ${order.ref} has been cancelled`,
     html: cancellationBodyHtml(order, reason),
+    attachments,
   });
 }

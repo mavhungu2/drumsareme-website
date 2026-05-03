@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Order } from "@/lib/admin/orders-types";
 import {
   COLLECTION_ADDRESS,
@@ -46,14 +47,26 @@ export default function Invoice({ order }: InvoiceProps) {
   return (
     <article className="invoice-doc bg-white text-black mx-auto max-w-[210mm] p-10 sm:p-16 print:p-12">
       <header className="flex items-start justify-between gap-6 border-b border-gray-300 pb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {BUSINESS_INFO.name}
-          </h1>
-          <p className="text-sm text-gray-600">{BUSINESS_INFO.tagline}</p>
-          <p className="mt-2 text-xs text-gray-600">
-            {BUSINESS_INFO.email} &middot; {BUSINESS_INFO.website}
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="relative w-20 h-20 shrink-0">
+            <Image
+              src="/images/logos/logo-black-trimmed.png"
+              alt={`${BUSINESS_INFO.name} logo`}
+              fill
+              sizes="80px"
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {BUSINESS_INFO.name}
+            </h1>
+            <p className="text-sm text-gray-600">{BUSINESS_INFO.tagline}</p>
+            <p className="mt-2 text-xs text-gray-600">
+              {BUSINESS_INFO.email} &middot; {BUSINESS_INFO.website}
+            </p>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-xs uppercase tracking-wider text-gray-500">
