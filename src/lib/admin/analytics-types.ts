@@ -80,6 +80,8 @@ export interface ManualSaleInput {
     email?: string;
   };
   items: ManualSaleItemInput[];
+  fulfilment: "delivery" | "collection";
+  deliveryFee: number;
   notes?: string;
 }
 
@@ -89,6 +91,7 @@ export interface ManualSaleResponse {
   subtotal: number;
   total: number;
   shipping: number;
+  fulfilment: "delivery" | "collection";
 }
 
 export interface MarkPaidInput {

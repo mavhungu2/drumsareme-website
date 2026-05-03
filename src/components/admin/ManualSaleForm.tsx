@@ -1,12 +1,23 @@
 "use client";
 
 import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  MapPin,
+  Plus,
+  Trash2,
+  Truck,
+} from "lucide-react";
 import {
   AdminApiError,
   createManualSale,
 } from "@/lib/admin/api-client";
 import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
+import {
+  COLLECTION_ADDRESS,
+  type Fulfilment,
+} from "@/lib/admin/orders-types";
 import { products as bakedProducts } from "@/lib/products";
 import { useLiveCatalog, useLiveOverlay } from "@/lib/use-live-products";
 import { formatZar } from "@/lib/admin/format";
@@ -49,11 +60,18 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
+  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
+  const [deliveryFeeInput, setDeliveryFeeInput] = useState("0");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickedCustomer, setPickedCustomer] = useState<PickerCustomer | null>(
     null,
   );
+
+  const deliveryFee =
+    fulfilment === "collection"
+      ? 0
+      : Math.max(0, Number.parseFloat(deliveryFeeInput) || 0);
 
   const overlay = useLiveOverlay();
 
@@ -159,6 +177,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         );
       }
 
+      if (fulfilment === "delivery" && (!Number.isFinite(deliveryFee) || deliveryFee < 0)) {
+        return setError("Delivery fee must be a non-negative number.");
+      }
+
       setSubmitting(true);
       setError(null);
       try {
@@ -170,6 +192,8 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
             email: email.trim() || undefined,
           },
           items,
+          fulfilment,
+          deliveryFee,
           notes: notes.trim() || undefined,
         });
         onSubmitted(response);
@@ -186,12 +210,15 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       }
     },
     [
+      deliveryFee,
       email,
       firstName,
+      fulfilment,
       lastName,
       notes,
       onSubmitted,
       phone,
+      products,
       rows,
       stockIssues,
     ],
@@ -204,9 +231,9 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       className="rounded-2xl border border-border bg-background p-5 sm:p-6 space-y-5"
     >
       <p className="text-xs text-muted">
-        This saves the order as <strong>pending</strong>. Open the order from
-        the list to capture payment method, fulfilment, and decrement stock
-        when payment lands.
+        This saves the order as <strong>pending</strong> and emails the
+        customer the invoice with EFT details. Open the order from the list
+        to capture payment method and decrement stock when payment lands.
       </p>
 
       <section className="space-y-3">
@@ -389,6 +416,72 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Fulfilment</h2>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label
+            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
+              fulfilment === "delivery"
+                ? "border-foreground bg-surface"
+                : "border-border bg-background hover:bg-surface"
+            }`}
+          >
+            <input
+              type="radio"
+              name="fulfilment"
+              value="delivery"
+              checked={fulfilment === "delivery"}
+              onChange={() => setFulfilment("delivery")}
+              className="sr-only"
+            />
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <Truck size={14} aria-hidden />
+              Delivery
+            </span>
+            <span className="block text-xs text-muted mt-0.5">
+              Ships to the customer&rsquo;s address
+            </span>
+          </label>
+          <label
+            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
+              fulfilment === "collection"
+                ? "border-foreground bg-surface"
+                : "border-border bg-background hover:bg-surface"
+            }`}
+          >
+            <input
+              type="radio"
+              name="fulfilment"
+              value="collection"
+              checked={fulfilment === "collection"}
+              onChange={() => setFulfilment("collection")}
+              className="sr-only"
+            />
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <MapPin size={14} aria-hidden />
+              Self-collection
+            </span>
+            <span className="block text-xs text-muted mt-0.5">
+              {COLLECTION_ADDRESS.name}, {COLLECTION_ADDRESS.line1},{" "}
+              {COLLECTION_ADDRESS.city}
+            </span>
+          </label>
+        </div>
+        {fulfilment === "delivery" && (
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+            <span>Delivery fee (ZAR)</span>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={deliveryFeeInput}
+              onChange={(e) => setDeliveryFeeInput(e.target.value)}
+              className="h-10 max-w-xs rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+          </label>
+        )}
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Notes</h2>
         <label
           htmlFor={notesId}
@@ -406,14 +499,21 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       </section>
 
       <section className="border-t border-border pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <dl className="text-sm text-foreground space-y-1 tabular-nums">
-          <div className="flex gap-3 justify-between sm:justify-start font-semibold">
-            <dt>Subtotal</dt>
+        <dl className="text-sm text-foreground space-y-1 tabular-nums min-w-[12rem]">
+          <div className="flex gap-3 justify-between sm:justify-start">
+            <dt className="text-muted">Subtotal</dt>
             <dd>{formatZar(subtotal)}</dd>
           </div>
-          <p className="text-xs text-muted font-normal">
-            Delivery fee added when marking the order paid.
-          </p>
+          <div className="flex gap-3 justify-between sm:justify-start">
+            <dt className="text-muted">
+              {fulfilment === "collection" ? "Collection" : "Delivery"}
+            </dt>
+            <dd>{deliveryFee > 0 ? formatZar(deliveryFee) : "Free"}</dd>
+          </div>
+          <div className="flex gap-3 justify-between sm:justify-start font-semibold pt-1 border-t border-border mt-1">
+            <dt>Total</dt>
+            <dd>{formatZar(subtotal + deliveryFee)}</dd>
+          </div>
         </dl>
         <button
           type="submit"

@@ -7,6 +7,7 @@ import {
   FieldValue,
   generateOrderRef,
   type Customer,
+  type Fulfilment,
   type InventoryItem,
   type Order,
   type OrderItem,
@@ -36,6 +37,8 @@ interface ManualSaleInput {
     email?: string;
   };
   items: ManualSaleItemInput[];
+  fulfilment: Fulfilment;
+  deliveryFee: number;
   notes?: string;
 }
 
@@ -81,9 +84,45 @@ function trimRequiredString(
 function validate(
   body: Record<string, unknown>,
 ): { ok: true; input: ManualSaleInput } | { ok: false; error: string } {
-  const { customer, items, notes, ...extra } = body;
+  const {
+    customer,
+    items,
+    fulfilment: rawFulfilment,
+    deliveryFee,
+    notes,
+    ...extra
+  } = body;
   if (Object.keys(extra).length > 0) {
     return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+
+  let fulfilment: Fulfilment = "delivery";
+  if (rawFulfilment !== undefined) {
+    if (rawFulfilment !== "delivery" && rawFulfilment !== "collection") {
+      return {
+        ok: false,
+        error: "fulfilment must be 'delivery' or 'collection'",
+      };
+    }
+    fulfilment = rawFulfilment;
+  }
+
+  let deliveryFeeClean = 0;
+  if (deliveryFee !== undefined) {
+    if (
+      typeof deliveryFee !== "number" ||
+      !Number.isFinite(deliveryFee) ||
+      deliveryFee < 0
+    ) {
+      return { ok: false, error: "deliveryFee must be a non-negative number" };
+    }
+    deliveryFeeClean = Math.round(deliveryFee * 100) / 100;
+  }
+  if (fulfilment === "collection" && deliveryFeeClean > 0) {
+    return {
+      ok: false,
+      error: "deliveryFee must be 0 for collection orders",
+    };
   }
 
   if (!customer || typeof customer !== "object") {
@@ -157,6 +196,8 @@ function validate(
         email,
       },
       items: cleanItems,
+      fulfilment,
+      deliveryFee: deliveryFeeClean,
       notes: notesClean,
     },
   };
@@ -241,18 +282,20 @@ async function createManualSale(
     ...(input.notes ? { notes: input.notes } : {}),
   };
 
-  // Pending draft: payment method, fulfilment, delivery fee, and the
-  // inventory decrement are all deferred to the Mark as Paid action on the
-  // order detail page.
+  // Pending draft: fulfilment + delivery fee captured up front so the
+  // emailed invoice has the right total. Payment method and the inventory
+  // decrement are still deferred to the Mark as Paid action.
+  const total = subtotal + input.deliveryFee;
   await orderDoc.set({
     ref,
     status: "pending",
     source: "manual",
+    fulfilment: input.fulfilment,
     inventoryApplied: false,
     items: orderItems,
     subtotal,
-    shipping: 0,
-    total: subtotal,
+    shipping: input.deliveryFee,
+    total,
     customer,
     yoco: { checkoutId: "" },
     createdAt: FieldValue.serverTimestamp(),
@@ -263,6 +306,8 @@ async function createManualSale(
     orderId: orderDoc.id,
     ref,
     subtotal,
+    deliveryFee: input.deliveryFee,
+    fulfilment: input.fulfilment,
   });
 
   // Fire-and-forget invoice email so the customer gets EFT details
@@ -288,8 +333,9 @@ async function createManualSale(
     id: orderDoc.id,
     ref,
     subtotal,
-    total: subtotal,
-    shipping: 0,
+    total,
+    shipping: input.deliveryFee,
+    fulfilment: input.fulfilment,
   });
 }
 
