@@ -210,10 +210,12 @@ export default function OrderDetailView({
               >
                 {mutating ? (
                   <Loader2 size={14} className="animate-spin" aria-hidden />
+                ) : isCollection ? (
+                  <MapPin size={14} aria-hidden />
                 ) : (
                   <Truck size={14} aria-hidden />
                 )}
-                Mark as shipped
+                {isCollection ? "Mark as ready to collect" : "Mark as shipped"}
               </button>
             ) : null}
             {canMarkCompleted ? (

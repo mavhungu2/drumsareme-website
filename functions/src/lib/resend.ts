@@ -112,12 +112,26 @@ export async function sendShippingConfirmation(
   order: Order,
   tracking: OrderTracking,
 ): Promise<void> {
+  const isCollection = order.fulfilment === "collection";
+  const subject = isCollection
+    ? `Order ${order.ref} ready for collection`
+    : `Your order ${order.ref} has shipped!`;
+  const intro = isCollection
+    ? "Your order is ready to collect"
+    : "Your order is on its way";
+  // Tracking fields are still captured (admin records who handed it over for
+  // collection too) but we don't render the courier-style tracking block on
+  // a collection email — the address is already in the body via
+  // fulfilmentBlockHtml.
+  const body = isCollection
+    ? orderBodyHtml(order, intro)
+    : `${orderBodyHtml(order, intro)}${trackingHtml(tracking)}`;
   const resend = new Resend(apiKey);
   await resend.emails.send({
     from: FROM,
     to: order.customer.email,
-    subject: `Your order ${order.ref} has shipped!`,
-    html: `${orderBodyHtml(order, "Your order is on its way")}${trackingHtml(tracking)}`,
+    subject,
+    html: body,
   });
 }
 
