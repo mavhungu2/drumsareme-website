@@ -18,6 +18,7 @@ import { applyCors } from "./lib/cors";
 import { InsufficientStockError } from "./lib/errors";
 import {
   sendCancellationNotification,
+  sendCustomerInvoice,
   sendCustomerReceipt,
   sendShippingConfirmation,
 } from "./lib/resend";
@@ -708,17 +709,28 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   type TxResult =
     | { kind: "not-found" }
     | { kind: "bad-status"; status: Order["status"] }
+    | { kind: "no-email" }
     | { kind: "rate-limited"; retryAfterSeconds: number }
-    | { kind: "ok"; order: Order };
+    | { kind: "ok"; order: Order; mode: "invoice" | "receipt" };
 
   const result = await db.runTransaction<TxResult>(async (tx) => {
     const snap = await tx.get(orderRef);
     if (!snap.exists) return { kind: "not-found" };
     const order = snap.data() as Order;
 
-    if (order.status !== "paid" && order.status !== "shipped") {
+    // Mode is decided by status: pending sends the invoice (with EFT
+    // banking details); paid/shipped/completed re-send the receipt.
+    const isPending =
+      order.status === "pending" && order.source === "manual";
+    const isReceipt =
+      order.status === "paid" ||
+      order.status === "shipped" ||
+      order.status === "completed";
+    if (!isPending && !isReceipt) {
       return { kind: "bad-status", status: order.status };
     }
+
+    if (!order.customer.email) return { kind: "no-email" };
 
     const last = order.receiptResendAt;
     if (last) {
@@ -734,7 +746,11 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
     tx.update(orderRef, {
       receiptResendAt: FieldValue.serverTimestamp(),
     });
-    return { kind: "ok", order };
+    return {
+      kind: "ok",
+      order,
+      mode: isPending ? "invoice" : "receipt",
+    };
   });
 
   if (result.kind === "not-found") {
@@ -743,7 +759,13 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   }
   if (result.kind === "bad-status") {
     res.status(409).json({
-      error: `Cannot resend receipt for ${result.status} order`,
+      error: `Cannot resend email for ${result.status} order`,
+    });
+    return;
+  }
+  if (result.kind === "no-email") {
+    res.status(409).json({
+      error: "Order has no customer email address on file",
     });
     return;
   }
@@ -759,11 +781,16 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   // Transaction committed the timestamp. If the email now fails the admin
   // can't retry for 10 min — documented trade-off vs. double-send risk.
   try {
-    await sendCustomerReceipt(RESEND_API_KEY.value(), result.order);
+    if (result.mode === "invoice") {
+      await sendCustomerInvoice(RESEND_API_KEY.value(), result.order);
+    } else {
+      await sendCustomerReceipt(RESEND_API_KEY.value(), result.order);
+    }
   } catch (err) {
-    logger.error("Receipt resend email failed", {
+    logger.error("Email resend failed", {
       uid,
       orderId,
+      mode: result.mode,
       err: String(err),
     });
     res.status(502).json({ error: "Email send failed" });
@@ -773,10 +800,11 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   const sentAt = new Date().toISOString();
   logger.info("adminOrderActions", {
     uid,
-    action: "resend-receipt",
+    action: "resend-email",
     orderId,
+    mode: result.mode,
   });
-  res.status(200).json({ ok: true, sentAt });
+  res.status(200).json({ ok: true, sentAt, mode: result.mode });
 };
 
 // Route table: first match wins. Leading segment is always the orderId, so

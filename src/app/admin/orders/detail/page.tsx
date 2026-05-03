@@ -202,15 +202,17 @@ function OrderDetailContent() {
   }, [id, refetch]);
 
   const handleResendReceipt = useCallback(async () => {
-    if (!id) return;
-    if (!window.confirm("Resend receipt email to customer?")) return;
+    if (!id || !order) return;
+    const isInvoice = order.status === "pending";
+    const verb = isInvoice ? "invoice" : "receipt";
+    if (!window.confirm(`Resend ${verb} email to customer?`)) return;
     setMutating(true);
     setMutationBanner(null);
     try {
       await resendReceipt(id);
       setMutationBanner({
         kind: "success",
-        message: "Receipt email sent.",
+        message: `${verb[0].toUpperCase()}${verb.slice(1)} email sent.`,
       });
     } catch (err) {
       const message =
@@ -218,12 +220,12 @@ function OrderDetailContent() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to resend receipt";
+            : `Failed to resend ${verb}`;
       setMutationBanner({ kind: "error", message });
     } finally {
       setMutating(false);
     }
-  }, [id]);
+  }, [id, order]);
 
   const handleAddNote = useCallback(
     async (body: string) => {

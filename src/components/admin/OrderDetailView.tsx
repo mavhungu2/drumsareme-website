@@ -87,9 +87,13 @@ export default function OrderDetailView({
     order.status !== "completed";
   const canResendReceipt =
     Boolean(onResendReceipt) &&
+    Boolean(order.customer.email) &&
     (order.status === "paid" ||
       order.status === "shipped" ||
-      order.status === "completed");
+      order.status === "completed" ||
+      (order.status === "pending" && order.source === "manual"));
+  const resendLabel =
+    order.status === "pending" ? "Resend invoice" : "Resend receipt";
 
   const isCollection = order.fulfilment === "collection";
   const isDelivery = order.fulfilment === "delivery";
@@ -256,7 +260,7 @@ export default function OrderDetailView({
                 className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Mail size={14} aria-hidden />
-                Resend receipt
+                {resendLabel}
               </button>
             ) : null}
             {canCancel ? (

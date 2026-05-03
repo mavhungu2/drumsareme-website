@@ -86,6 +86,40 @@ function orderBodyHtml(order: Order, intro: string): string {
   `);
 }
 
+function invoiceBodyHtml(order: Order): string {
+  return emailContainer(`
+    <h2 style="margin:0 0 8px">Here's your invoice</h2>
+    <p style="color:#6b7280;margin:0 0 16px">Order <strong>${order.ref}</strong></p>
+    <p style="margin:0 0 16px;font-size:14px;color:#374151">Thanks for your order. The invoice is attached as a PDF and the line items are listed below. Please pay via EFT using the banking details and reference shown on the invoice. Send proof of payment to <a href="mailto:orders@drumsareme.co.za">orders@drumsareme.co.za</a> and we'll mark the order as paid.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      ${itemsHtml(order)}
+      <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
+      <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total due</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
+    </table>
+    ${
+      order.customer.notes
+        ? `<p style="margin:16px 0 0;font-size:13px;color:#6b7280"><em>Note:</em> ${escapeHtml(order.customer.notes)}</p>`
+        : ""
+    }
+  `);
+}
+
+export async function sendCustomerInvoice(
+  apiKey: string,
+  order: Order,
+): Promise<void> {
+  if (!order.customer.email) return;
+  const resend = new Resend(apiKey);
+  const attachments = await buildPdfAttachment(order, false);
+  await resend.emails.send({
+    from: FROM,
+    to: order.customer.email,
+    subject: `Invoice ${order.ref} — payment due`,
+    html: invoiceBodyHtml(order),
+    attachments,
+  });
+}
+
 export async function sendCustomerReceipt(
   apiKey: string,
   order: Order,

@@ -1,5 +1,6 @@
 import { onRequest, type Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
+import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import {
   db,
@@ -14,6 +15,9 @@ import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 import { InsufficientStockError } from "./lib/errors";
 import { getServerProduct } from "./lib/products";
+import { sendCustomerInvoice } from "./lib/resend";
+
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
 const MAX_NAME_LEN = 120;
 const MAX_PHONE_LEN = 30;
@@ -261,6 +265,25 @@ async function createManualSale(
     subtotal,
   });
 
+  // Fire-and-forget invoice email so the customer gets EFT details
+  // automatically. Failure must not block the create response.
+  if (customer.email) {
+    try {
+      const saved = await orderDoc.get();
+      const order = { ...(saved.data() as Order) };
+      await sendCustomerInvoice(RESEND_API_KEY.value(), order);
+      await orderDoc.update({
+        receiptResendAt: FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      logger.error("Auto invoice email failed", {
+        uid: auth.uid,
+        orderId: orderDoc.id,
+        err: String(err),
+      });
+    }
+  }
+
   res.status(201).json({
     id: orderDoc.id,
     ref,
@@ -271,7 +294,12 @@ async function createManualSale(
 }
 
 export const adminManualSales = onRequest(
-  { region: "us-central1", cors: false, invoker: "public" },
+  {
+    region: "us-central1",
+    cors: false,
+    invoker: "public",
+    secrets: [RESEND_API_KEY],
+  },
   async (req, res) => {
     applyCors(req, res, "POST");
 
