@@ -73,13 +73,8 @@ function formatDate(ts: FirebaseFirestore.Timestamp | undefined): string {
 }
 
 function customerAddressLines(order: Order): string[] {
-  if (order.fulfilment === "collection") {
-    return [
-      `Collection from ${COLLECTION_ADDRESS.name}`,
-      `${COLLECTION_ADDRESS.line1}, ${COLLECTION_ADDRESS.suburb}`,
-      `${COLLECTION_ADDRESS.city}, ${COLLECTION_ADDRESS.postalCode}`,
-    ];
-  }
+  // Collection address lives in the right column; BILL TO keeps just contact.
+  if (order.fulfilment === "collection") return [];
   const lines: string[] = [];
   if (order.customer.addressLine1) lines.push(order.customer.addressLine1);
   if (order.customer.suburb) lines.push(order.customer.suburb);
@@ -241,20 +236,47 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
         rightColX,
         billY,
       );
-    doc
-      .font("Helvetica")
-      .fontSize(10)
-      .fillColor("#374151")
-      .text(
-        order.fulfilment === "collection"
-          ? `Self-collection from ${COLLECTION_ADDRESS.name}`
-          : order.fulfilment === "delivery"
+    if (order.fulfilment === "collection") {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .fillColor("#0a0a0a")
+        .text(
+          `Self-collection from ${COLLECTION_ADDRESS.name}`,
+          rightColX,
+          doc.y + 2,
+          { width: colWidth },
+        );
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("#374151")
+        .text(
+          `${COLLECTION_ADDRESS.line1}, ${COLLECTION_ADDRESS.suburb}`,
+          rightColX,
+          doc.y,
+          { width: colWidth },
+        )
+        .text(
+          `${COLLECTION_ADDRESS.city}, ${COLLECTION_ADDRESS.postalCode}`,
+          rightColX,
+          doc.y,
+          { width: colWidth },
+        );
+    } else {
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("#374151")
+        .text(
+          order.fulfilment === "delivery"
             ? "Delivery to address shown"
             : "To be confirmed",
-        rightColX,
-        doc.y + 2,
-        { width: colWidth },
-      );
+          rightColX,
+          doc.y + 2,
+          { width: colWidth },
+        );
+    }
     if (order.tracking) {
       doc
         .fontSize(9)
@@ -296,16 +318,14 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
     doc.font("Helvetica").fontSize(10).fillColor("#0a0a0a");
     for (const item of order.items) {
       const yStart = rowY;
+      // Combine name + productId on one line so the row divider doesn't
+      // visually cross through the SKU label.
+      const labelText = `${item.name}  ·  ${item.productId}`;
       doc
         .font("Helvetica-Bold")
         .fontSize(10)
         .fillColor("#0a0a0a")
-        .text(item.name, colItem, rowY, { width: pageWidth * 0.5 });
-      doc
-        .font("Helvetica")
-        .fontSize(8)
-        .fillColor("#6b7280")
-        .text(item.productId, colItem, doc.y);
+        .text(labelText, colItem, rowY, { width: pageWidth * 0.5 });
 
       doc
         .font("Helvetica")

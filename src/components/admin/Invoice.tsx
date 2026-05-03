@@ -2,10 +2,7 @@
 
 import Image from "next/image";
 import type { Order } from "@/lib/admin/orders-types";
-import {
-  COLLECTION_ADDRESS,
-  formatCollectionAddress,
-} from "@/lib/admin/orders-types";
+import { COLLECTION_ADDRESS } from "@/lib/admin/orders-types";
 import { BUSINESS_INFO } from "@/lib/admin/business-info";
 import { formatDate, formatZar } from "@/lib/admin/format";
 
@@ -19,12 +16,9 @@ const isPaid = (order: Order) =>
   order.status === "completed";
 
 function formatCustomerAddress(order: Order): string[] {
-  if (order.fulfilment === "collection") {
-    return [
-      `Collection from ${COLLECTION_ADDRESS.name}`,
-      formatCollectionAddress(),
-    ];
-  }
+  // Collection orders show the collection address in the right column;
+  // BILL TO keeps just the customer's contact details to avoid duplication.
+  if (order.fulfilment === "collection") return [];
   const cityLine = [
     order.customer.city,
     order.customer.province,
@@ -120,13 +114,25 @@ export default function Invoice({ order }: InvoiceProps) {
           <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">
             {order.fulfilment === "collection" ? "Collection" : "Fulfilment"}
           </p>
-          <p className="text-gray-700">
-            {order.fulfilment === "collection"
-              ? `Self-collection from ${COLLECTION_ADDRESS.name}`
-              : order.fulfilment === "delivery"
+          {order.fulfilment === "collection" ? (
+            <>
+              <p className="font-semibold text-gray-800">
+                Self-collection from {COLLECTION_ADDRESS.name}
+              </p>
+              <p className="text-gray-700">
+                {COLLECTION_ADDRESS.line1}, {COLLECTION_ADDRESS.suburb}
+              </p>
+              <p className="text-gray-700">
+                {COLLECTION_ADDRESS.city}, {COLLECTION_ADDRESS.postalCode}
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-700">
+              {order.fulfilment === "delivery"
                 ? "Delivery to address above"
                 : "To be confirmed"}
-          </p>
+            </p>
+          )}
           {order.tracking && (
             <p className="mt-2 text-xs text-gray-600">
               Tracking: {order.tracking.carrier} &middot;{" "}
@@ -150,9 +156,11 @@ export default function Invoice({ order }: InvoiceProps) {
             {order.items.map((item, index) => (
               <tr key={`${item.productId}-${index}`}>
                 <td className="py-3">
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">
-                    {item.productId}
+                  <p className="font-medium">
+                    {item.name}{" "}
+                    <span className="text-xs text-gray-500 font-mono font-normal">
+                      · {item.productId}
+                    </span>
                   </p>
                 </td>
                 <td className="py-3 text-right tabular-nums">{item.qty}</td>
