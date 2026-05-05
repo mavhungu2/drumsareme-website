@@ -1,12 +1,13 @@
 import Link from "next/link";
 import {
+  Archive,
+  ArchiveRestore,
   Ban,
   CheckCircle2,
   FileText,
   Loader2,
   Mail,
   MapPin,
-  Trash2,
   Truck,
 } from "lucide-react";
 import {
@@ -25,7 +26,8 @@ interface OrderDetailViewProps {
   onMarkShipped?: () => void;
   onMarkCompleted?: () => Promise<void>;
   onCancel?: () => void;
-  onDelete?: () => Promise<void>;
+  onArchive?: () => Promise<void>;
+  onUnarchive?: () => Promise<void>;
   onResendReceipt?: () => Promise<void>;
   onAddNote?: (body: string) => Promise<void>;
   mutating?: boolean;
@@ -72,7 +74,8 @@ export default function OrderDetailView({
   onMarkShipped,
   onMarkCompleted,
   onCancel,
-  onDelete,
+  onArchive,
+  onUnarchive,
   onResendReceipt,
   onAddNote,
   mutating = false,
@@ -88,11 +91,9 @@ export default function OrderDetailView({
     Boolean(onCancel) &&
     order.status !== "cancelled" &&
     order.status !== "completed";
-  const canDelete =
-    Boolean(onDelete) &&
-    (order.status === "cancelled" ||
-      order.status === "failed" ||
-      (order.status === "pending" && order.inventoryApplied !== true));
+  const isArchived = Boolean(order.archivedAt);
+  const canArchive = Boolean(onArchive) && !isArchived;
+  const canUnarchive = Boolean(onUnarchive) && isArchived;
   const canResendReceipt =
     Boolean(onResendReceipt) &&
     Boolean(order.customer.email) &&
@@ -198,7 +199,15 @@ export default function OrderDetailView({
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          <OrderStatusBadge status={order.status} />
+          <div className="flex items-center gap-2">
+            <OrderStatusBadge status={order.status} />
+            {isArchived ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                <Archive size={11} aria-hidden />
+                Archived
+              </span>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {canMarkPaid ? (
               <button
@@ -282,15 +291,26 @@ export default function OrderDetailView({
                 Cancel order
               </button>
             ) : null}
-            {canDelete ? (
+            {canArchive ? (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={onArchive}
                 disabled={mutating}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-medium text-red-800 transition-colors hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-muted transition-colors hover:bg-surface hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Trash2 size={14} aria-hidden />
-                Delete order
+                <Archive size={14} aria-hidden />
+                Archive
+              </button>
+            ) : null}
+            {canUnarchive ? (
+              <button
+                type="button"
+                onClick={onUnarchive}
+                disabled={mutating}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArchiveRestore size={14} aria-hidden />
+                Unarchive
               </button>
             ) : null}
           </div>

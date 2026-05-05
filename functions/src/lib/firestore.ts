@@ -84,6 +84,8 @@ export interface Order {
   shippedAt?: FirebaseFirestore.Timestamp;
   completedAt?: FirebaseFirestore.Timestamp;
   cancelledAt?: FirebaseFirestore.Timestamp;
+  archivedAt?: FirebaseFirestore.Timestamp;
+  archivedBy?: string;
   receiptResendAt?: FirebaseFirestore.Timestamp;
   tracking?: OrderTracking;
   notes?: OrderNote[];

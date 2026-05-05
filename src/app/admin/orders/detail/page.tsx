@@ -7,10 +7,11 @@ import { AlertCircle, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import {
   AdminApiError,
   addNote,
-  deleteOrder,
+  archiveOrder,
   getOrder,
   markCompleted,
   resendReceipt,
+  unarchiveOrder,
 } from "@/lib/admin/api-client";
 import type { Order } from "@/lib/admin/orders-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
@@ -203,16 +204,16 @@ function OrderDetailContent() {
     }
   }, [id, refetch]);
 
-  const handleDelete = useCallback(async () => {
+  const handleArchive = useCallback(async () => {
     if (!id || !order) return;
     const confirmed = window.confirm(
-      `Permanently delete order ${order.ref}? This cannot be undone.`,
+      `Archive order ${order.ref}? It will be hidden from the orders list and analytics. You can unarchive it later.`,
     );
     if (!confirmed) return;
     setMutating(true);
     setMutationBanner(null);
     try {
-      await deleteOrder(id);
+      await archiveOrder(id);
       router.push("/admin/orders/");
     } catch (err) {
       const message =
@@ -220,11 +221,35 @@ function OrderDetailContent() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to delete order";
+            : "Failed to archive order";
       setMutationBanner({ kind: "error", message });
       setMutating(false);
     }
   }, [id, order, router]);
+
+  const handleUnarchive = useCallback(async () => {
+    if (!id) return;
+    setMutating(true);
+    setMutationBanner(null);
+    try {
+      await unarchiveOrder(id);
+      await refetch();
+      setMutationBanner({
+        kind: "success",
+        message: "Order unarchived — it's back in the active list.",
+      });
+    } catch (err) {
+      const message =
+        err instanceof AdminApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to unarchive order";
+      setMutationBanner({ kind: "error", message });
+    } finally {
+      setMutating(false);
+    }
+  }, [id, refetch]);
 
   const handleResendReceipt = useCallback(async () => {
     if (!id || !order) return;
@@ -306,7 +331,8 @@ function OrderDetailContent() {
         onMarkShipped={() => setShipDialogOpen(true)}
         onMarkCompleted={handleMarkCompleted}
         onCancel={() => setCancelDialogOpen(true)}
-        onDelete={handleDelete}
+        onArchive={handleArchive}
+        onUnarchive={handleUnarchive}
         onResendReceipt={handleResendReceipt}
         onAddNote={handleAddNote}
       />

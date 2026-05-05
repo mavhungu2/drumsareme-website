@@ -20,6 +20,7 @@ const INITIAL_FILTERS: OrderFiltersValue = {
   from: "",
   to: "",
   hideCancelled: false,
+  includeArchived: false,
 };
 
 function dateInputToIsoStart(value: string): string | undefined {
@@ -44,6 +45,7 @@ function buildQuery(
     from: dateInputToIsoStart(filters.from),
     to: dateInputToIsoEnd(filters.to),
     limit: PAGE_SIZE,
+    includeArchived: filters.includeArchived,
   };
 }
 

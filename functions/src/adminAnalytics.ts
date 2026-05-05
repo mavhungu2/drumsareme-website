@@ -157,6 +157,9 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
 
   ordersSnap.forEach((doc) => {
     const order = doc.data() as Order;
+    // Archived orders are hidden from every analytics surface — they
+    // shouldn't influence revenue, customer aggregates, or status counts.
+    if (order.archivedAt) return;
     // Always count the status so the dashboard's status breakdown reflects
     // pending drafts. Skip pending for revenue / units / customers / product
     // performance below since drafts haven't generated revenue yet.
