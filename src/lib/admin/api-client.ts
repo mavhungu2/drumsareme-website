@@ -212,14 +212,6 @@ export async function cancelOrder(
   });
 }
 
-export async function deleteOrder(
-  id: string,
-): Promise<{ ok: true; id: string }> {
-  if (!id) throw new AdminApiError(400, "Missing order id");
-  const url = buildUrl(`/api/admin/orders/${encodeURIComponent(id)}`);
-  return requestJson<{ ok: true; id: string }>(url, { method: "DELETE" });
-}
-
 export interface ResendReceiptResponse {
   ok: true;
   sentAt: string;

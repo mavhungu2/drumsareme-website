@@ -94,7 +94,6 @@ async function probeUnauthenticated() {
     ["DELETE", "/api/admin/admins/whatever@example.com"],
     ["GET", "/api/admin/orders"],
     ["GET", "/api/admin/orders/anything"],
-    ["DELETE", "/api/admin/orders/anything"],
     ["POST", "/api/admin/orders/anything/notes"],
     ["POST", "/api/admin/orders/anything/cancel"],
     ["POST", "/api/admin/orders/anything/mark-paid"],

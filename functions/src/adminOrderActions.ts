@@ -35,7 +35,7 @@ interface ActionContext {
 }
 
 interface RouteEntry {
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST";
   handler: Handler;
   action: string;
 }
@@ -486,43 +486,6 @@ function validateMarkPaidInput(
   };
 }
 
-/**
- * Permanently deletes an order doc. Allowed only for orders that never
- * generated revenue or have already been cancelled — paid/shipped/completed
- * orders have to be cancelled first (which credits inventory back and emails
- * the customer) before they can be removed, so financial / inventory state
- * stays consistent.
- */
-const adminDeleteOrder: Handler = async ({ res, uid, orderId }) => {
-  const orderRef = db.collection("orders").doc(orderId);
-  const snap = await orderRef.get();
-  if (!snap.exists) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-  const order = snap.data() as Order;
-  const deletable =
-    order.status === "cancelled" ||
-    order.status === "failed" ||
-    (order.status === "pending" && order.inventoryApplied !== true);
-  if (!deletable) {
-    res.status(409).json({
-      error:
-        "Cancel the order before deleting it — paid/shipped/completed orders need an audit trail and inventory roll-back.",
-    });
-    return;
-  }
-  await orderRef.delete();
-  logger.info("adminOrderActions", {
-    uid,
-    action: "delete",
-    orderId,
-    status: order.status,
-    ref: order.ref,
-  });
-  res.status(200).json({ ok: true, id: orderId });
-};
-
 const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
   const parsed = parseJsonBody(req);
   if (!parsed.ok) {
@@ -852,10 +815,7 @@ const ROUTES: Array<{
 }> = [
   {
     subPath: "",
-    entries: [
-      { method: "GET", action: "get", handler: adminGetOrder },
-      { method: "DELETE", action: "delete", handler: adminDeleteOrder },
-    ],
+    entries: [{ method: "GET", action: "get", handler: adminGetOrder }],
   },
   {
     subPath: "mark-shipped",
@@ -928,7 +888,7 @@ export const adminOrderActions = onRequest(
     secrets: [RESEND_API_KEY],
   },
   async (req, res) => {
-    applyCors(req, res, "GET,POST,DELETE");
+    applyCors(req, res, "GET,POST");
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");

@@ -2,12 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import {
   AdminApiError,
   addNote,
-  deleteOrder,
   getOrder,
   markCompleted,
   resendReceipt,
@@ -99,7 +98,6 @@ function MutationBannerView({ banner }: { banner: MutationBanner }) {
 
 function OrderDetailContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const id = searchParams.get("id");
   const { user, loading: authLoading } = useAdminAuth();
   const [order, setOrder] = useState<Order | null>(null);
@@ -203,29 +201,6 @@ function OrderDetailContent() {
     }
   }, [id, refetch]);
 
-  const handleDelete = useCallback(async () => {
-    if (!id || !order) return;
-    const confirmed = window.confirm(
-      `Permanently delete order ${order.ref}? This cannot be undone.`,
-    );
-    if (!confirmed) return;
-    setMutating(true);
-    setMutationBanner(null);
-    try {
-      await deleteOrder(id);
-      router.push("/admin/orders/");
-    } catch (err) {
-      const message =
-        err instanceof AdminApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to delete order";
-      setMutationBanner({ kind: "error", message });
-      setMutating(false);
-    }
-  }, [id, order, router]);
-
   const handleResendReceipt = useCallback(async () => {
     if (!id || !order) return;
     const isInvoice = order.status === "pending";
@@ -306,7 +281,6 @@ function OrderDetailContent() {
         onMarkShipped={() => setShipDialogOpen(true)}
         onMarkCompleted={handleMarkCompleted}
         onCancel={() => setCancelDialogOpen(true)}
-        onDelete={handleDelete}
         onResendReceipt={handleResendReceipt}
         onAddNote={handleAddNote}
       />

@@ -6,7 +6,6 @@ import {
   Loader2,
   Mail,
   MapPin,
-  Trash2,
   Truck,
 } from "lucide-react";
 import {
@@ -25,7 +24,6 @@ interface OrderDetailViewProps {
   onMarkShipped?: () => void;
   onMarkCompleted?: () => Promise<void>;
   onCancel?: () => void;
-  onDelete?: () => Promise<void>;
   onResendReceipt?: () => Promise<void>;
   onAddNote?: (body: string) => Promise<void>;
   mutating?: boolean;
@@ -72,7 +70,6 @@ export default function OrderDetailView({
   onMarkShipped,
   onMarkCompleted,
   onCancel,
-  onDelete,
   onResendReceipt,
   onAddNote,
   mutating = false,
@@ -88,11 +85,6 @@ export default function OrderDetailView({
     Boolean(onCancel) &&
     order.status !== "cancelled" &&
     order.status !== "completed";
-  const canDelete =
-    Boolean(onDelete) &&
-    (order.status === "cancelled" ||
-      order.status === "failed" ||
-      (order.status === "pending" && order.inventoryApplied !== true));
   const canResendReceipt =
     Boolean(onResendReceipt) &&
     Boolean(order.customer.email) &&
@@ -280,17 +272,6 @@ export default function OrderDetailView({
               >
                 <Ban size={14} aria-hidden />
                 Cancel order
-              </button>
-            ) : null}
-            {canDelete ? (
-              <button
-                type="button"
-                onClick={onDelete}
-                disabled={mutating}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-medium text-red-800 transition-colors hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2 size={14} aria-hidden />
-                Delete order
               </button>
             ) : null}
           </div>
