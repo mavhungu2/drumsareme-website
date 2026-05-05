@@ -28,7 +28,6 @@ interface OrderListItem {
   createdAt: string;
   paidAt?: string;
   shippedAt?: string;
-  archivedAt?: string;
 }
 
 interface ListQuery {
@@ -38,7 +37,6 @@ interface ListQuery {
   to?: Timestamp;
   limit: number;
   cursor?: string;
-  includeArchived: boolean;
 }
 
 function firstQueryValue(
@@ -83,18 +81,8 @@ function parseQuery(
 
   const limit = parseLimit(firstQueryValue(rawQuery.limit));
   const cursor = firstQueryValue(rawQuery.cursor);
-  const includeArchived =
-    firstQueryValue(rawQuery.includeArchived) === "true";
 
-  return {
-    status,
-    q,
-    from,
-    to,
-    limit,
-    cursor: cursor || undefined,
-    includeArchived,
-  };
+  return { status, q, from, to, limit, cursor: cursor || undefined };
 }
 
 function matchesSearch(order: Order, q: string): boolean {
@@ -125,7 +113,6 @@ function toListItem(id: string, order: Order): OrderListItem {
     createdAt,
     paidAt: timestampToIso(order.paidAt),
     shippedAt: timestampToIso(order.shippedAt),
-    archivedAt: timestampToIso(order.archivedAt),
   };
 }
 
@@ -193,20 +180,12 @@ export const adminListOrders = onRequest(
       const hasMore = docs.length > parsed.limit;
       const pageDocs = hasMore ? docs.slice(0, parsed.limit) : docs;
 
-      // Archived orders are hidden by default. Admin can pass
-      // includeArchived=true to surface them (e.g. for unarchive flow).
-      const visibility = parsed.includeArchived
-        ? pageDocs
-        : pageDocs.filter((doc) => !(doc.data() as Order).archivedAt);
-
       // Substring search (ref / email) is applied in-memory because Firestore
       // does not support `LIKE`-style queries. This is safe at the current
       // volume; revisit with Algolia / Typesense if the dataset grows.
       const filtered = parsed.q
-        ? visibility.filter((doc) =>
-            matchesSearch(doc.data() as Order, parsed.q!),
-          )
-        : visibility;
+        ? pageDocs.filter((doc) => matchesSearch(doc.data() as Order, parsed.q!))
+        : pageDocs;
 
       const orders = filtered.map((doc) => toListItem(doc.id, doc.data() as Order));
       const nextCursor = hasMore ? pageDocs[pageDocs.length - 1].id : null;

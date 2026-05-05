@@ -13,7 +13,6 @@ export interface OrderFiltersValue {
   from: string;
   to: string;
   hideCancelled: boolean;
-  includeArchived: boolean;
 }
 
 interface OrderFiltersProps {
@@ -106,16 +105,6 @@ export default function OrderFilters({
           className="h-4 w-4 rounded border-border text-foreground focus:ring-accent"
         />
         Hide cancelled orders
-      </label>
-
-      <label className="flex items-center gap-2 text-sm text-foreground lg:col-span-5">
-        <input
-          type="checkbox"
-          checked={value.includeArchived}
-          onChange={(e) => update("includeArchived", e.target.checked)}
-          className="h-4 w-4 rounded border-border text-foreground focus:ring-accent"
-        />
-        Show archived orders
       </label>
     </fieldset>
   );

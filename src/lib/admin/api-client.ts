@@ -142,7 +142,6 @@ export async function listOrders(
     to: params.to,
     limit: params.limit,
     cursor: params.cursor,
-    includeArchived: params.includeArchived ? "true" : undefined,
   });
   return requestJson<ListOrdersResponse>(url, { method: "GET" });
 }
@@ -213,26 +212,12 @@ export async function cancelOrder(
   });
 }
 
-export type ArchiveOrderResponse =
-  | { ok: true; id: string }
-  | { already: true };
-
-export async function archiveOrder(
+export async function deleteOrder(
   id: string,
-): Promise<ArchiveOrderResponse> {
+): Promise<{ ok: true; id: string }> {
   if (!id) throw new AdminApiError(400, "Missing order id");
-  const url = buildUrl(`/api/admin/orders/${encodeURIComponent(id)}/archive`);
-  return requestJson<ArchiveOrderResponse>(url, { method: "POST" });
-}
-
-export async function unarchiveOrder(
-  id: string,
-): Promise<ArchiveOrderResponse> {
-  if (!id) throw new AdminApiError(400, "Missing order id");
-  const url = buildUrl(
-    `/api/admin/orders/${encodeURIComponent(id)}/unarchive`,
-  );
-  return requestJson<ArchiveOrderResponse>(url, { method: "POST" });
+  const url = buildUrl(`/api/admin/orders/${encodeURIComponent(id)}`);
+  return requestJson<{ ok: true; id: string }>(url, { method: "DELETE" });
 }
 
 export interface ResendReceiptResponse {

@@ -94,8 +94,6 @@ export interface Order {
   shippedAt?: string;
   completedAt?: string;
   cancelledAt?: string;
-  archivedAt?: string;
-  archivedBy?: string;
   tracking?: OrderTracking;
   notes?: OrderNote[];
 }
@@ -112,7 +110,6 @@ export interface OrderListItem {
   createdAt: string;
   paidAt?: string;
   shippedAt?: string;
-  archivedAt?: string;
 }
 
 export interface ListOrdersResponse {
@@ -127,7 +124,6 @@ export interface ListOrdersQuery {
   to?: string;
   limit?: number;
   cursor?: string;
-  includeArchived?: boolean;
 }
 
 export const ORDER_STATUSES: ReadonlyArray<OrderStatus> = [

@@ -35,7 +35,7 @@ interface ActionContext {
 }
 
 interface RouteEntry {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "DELETE";
   handler: Handler;
   action: string;
 }
@@ -487,12 +487,13 @@ function validateMarkPaidInput(
 }
 
 /**
- * Archives an order — sets `archivedAt` so the order is hidden from the
- * default orders list and excluded from analytics, but the doc itself is
- * preserved for audit/unarchive. Status, inventory, and emails are
- * untouched, so archiving is safe at any lifecycle stage.
+ * Permanently deletes an order doc. Allowed only for orders that never
+ * generated revenue or have already been cancelled — paid/shipped/completed
+ * orders have to be cancelled first (which credits inventory back and emails
+ * the customer) before they can be removed, so financial / inventory state
+ * stays consistent.
  */
-const adminArchiveOrder: Handler = async ({ res, uid, orderId }) => {
+const adminDeleteOrder: Handler = async ({ res, uid, orderId }) => {
   const orderRef = db.collection("orders").doc(orderId);
   const snap = await orderRef.get();
   if (!snap.exists) {
@@ -500,43 +501,23 @@ const adminArchiveOrder: Handler = async ({ res, uid, orderId }) => {
     return;
   }
   const order = snap.data() as Order;
-  if (order.archivedAt) {
-    res.status(200).json({ already: true });
+  const deletable =
+    order.status === "cancelled" ||
+    order.status === "failed" ||
+    (order.status === "pending" && order.inventoryApplied !== true);
+  if (!deletable) {
+    res.status(409).json({
+      error:
+        "Cancel the order before deleting it — paid/shipped/completed orders need an audit trail and inventory roll-back.",
+    });
     return;
   }
-  await orderRef.update({
-    archivedAt: FieldValue.serverTimestamp(),
-    archivedBy: uid,
-  });
+  await orderRef.delete();
   logger.info("adminOrderActions", {
     uid,
-    action: "archive",
+    action: "delete",
     orderId,
-    ref: order.ref,
-  });
-  res.status(200).json({ ok: true, id: orderId });
-};
-
-const adminUnarchiveOrder: Handler = async ({ res, uid, orderId }) => {
-  const orderRef = db.collection("orders").doc(orderId);
-  const snap = await orderRef.get();
-  if (!snap.exists) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-  const order = snap.data() as Order;
-  if (!order.archivedAt) {
-    res.status(200).json({ already: true });
-    return;
-  }
-  await orderRef.update({
-    archivedAt: FieldValue.delete(),
-    archivedBy: FieldValue.delete(),
-  });
-  logger.info("adminOrderActions", {
-    uid,
-    action: "unarchive",
-    orderId,
+    status: order.status,
     ref: order.ref,
   });
   res.status(200).json({ ok: true, id: orderId });
@@ -871,18 +852,9 @@ const ROUTES: Array<{
 }> = [
   {
     subPath: "",
-    entries: [{ method: "GET", action: "get", handler: adminGetOrder }],
-  },
-  {
-    subPath: "archive",
     entries: [
-      { method: "POST", action: "archive", handler: adminArchiveOrder },
-    ],
-  },
-  {
-    subPath: "unarchive",
-    entries: [
-      { method: "POST", action: "unarchive", handler: adminUnarchiveOrder },
+      { method: "GET", action: "get", handler: adminGetOrder },
+      { method: "DELETE", action: "delete", handler: adminDeleteOrder },
     ],
   },
   {
@@ -956,7 +928,7 @@ export const adminOrderActions = onRequest(
     secrets: [RESEND_API_KEY],
   },
   async (req, res) => {
-    applyCors(req, res, "GET,POST");
+    applyCors(req, res, "GET,POST,DELETE");
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");
