@@ -1,7 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logger } from "firebase-functions";
-import { db, FieldValue, type Order } from "./lib/firestore";
+import { db, FieldValue, type Order, type InventoryItem } from "./lib/firestore";
 import { verifyYocoSignature } from "./lib/yoco";
 import { sendCustomerReceipt, sendMerchantNotification } from "./lib/resend";
 
@@ -78,11 +78,46 @@ export const yocoWebhook = onRequest(
         res.status(200).send("Already paid");
         return;
       }
-      await orderRef.update({
-        status: "paid",
-        paidAt: FieldValue.serverTimestamp(),
-        "yoco.paymentId": event.payload?.id ?? null,
+
+      // Wrap order update + inventory decrement in one transaction for atomicity.
+      // inventoryApplied guards against double-decrement on Yoco retries.
+      await db.runTransaction(async (tx) => {
+        const freshSnap = await tx.get(orderRef);
+        if (!freshSnap.exists) throw new Error("Order vanished");
+        const fresh = freshSnap.data() as Order;
+        if (fresh.status === "paid" || fresh.inventoryApplied) return;
+
+        const paymentId = event.payload?.id ?? null;
+        tx.update(orderRef, {
+          status: "paid",
+          paidAt: FieldValue.serverTimestamp(),
+          "yoco.paymentId": paymentId,
+          inventoryApplied: true,
+        });
+
+        for (const item of fresh.items) {
+          const invRef = db.collection("inventory").doc(item.productId);
+          const invSnap = await tx.get(invRef);
+          if (invSnap.exists) {
+            const inv = invSnap.data() as InventoryItem;
+            const newUnitsSold = (inv.unitsSold ?? 0) + item.qty;
+            tx.update(invRef, {
+              unitsSold: newUnitsSold,
+              currentStock: (inv.openingStock ?? 0) - newUnitsSold,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          } else {
+            tx.set(invRef, {
+              productId: item.productId,
+              openingStock: 0,
+              unitsSold: item.qty,
+              currentStock: -item.qty,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
       });
+
       const paidOrder: Order = { ...order, status: "paid" };
       try {
         await sendCustomerReceipt(RESEND_API_KEY.value(), paidOrder);

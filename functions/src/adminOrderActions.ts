@@ -9,6 +9,7 @@ import {
   type Order,
   type OrderNote,
   type OrderTracking,
+  type InventoryItem,
 } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
@@ -363,11 +364,42 @@ const adminCancelOrder: Handler = async ({ req, res, uid, orderId }) => {
     body: `Order cancelled: ${reason}`,
   };
 
-  await orderRef.update({
-    status: "cancelled",
-    cancelledAt: FieldValue.serverTimestamp(),
-    notes: FieldValue.arrayUnion(cancellationNote),
-  });
+  if (order.inventoryApplied) {
+    // Credit inventory back in a transaction so it stays consistent.
+    await db.runTransaction(async (tx) => {
+      const freshSnap = await tx.get(orderRef);
+      if (!freshSnap.exists) return;
+      const fresh = freshSnap.data() as Order;
+      if (fresh.status === "cancelled") return; // already cancelled — idempotent
+
+      for (const item of fresh.items) {
+        const invRef = db.collection("inventory").doc(item.productId);
+        const invSnap = await tx.get(invRef);
+        if (invSnap.exists) {
+          const inv = invSnap.data() as InventoryItem;
+          const newUnitsSold = Math.max(0, (inv.unitsSold ?? 0) - item.qty);
+          tx.update(invRef, {
+            unitsSold: newUnitsSold,
+            currentStock: (inv.openingStock ?? 0) - newUnitsSold,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      tx.update(orderRef, {
+        status: "cancelled",
+        cancelledAt: FieldValue.serverTimestamp(),
+        inventoryApplied: false,
+        notes: FieldValue.arrayUnion(cancellationNote),
+      });
+    });
+  } else {
+    await orderRef.update({
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+      notes: FieldValue.arrayUnion(cancellationNote),
+    });
+  }
 
   if (notifyCustomer) {
     try {

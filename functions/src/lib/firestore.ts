@@ -59,6 +59,36 @@ export interface Order {
   receiptResendAt?: FirebaseFirestore.Timestamp;
   tracking?: OrderTracking;
   notes?: OrderNote[];
+  // Admin business workbook additions
+  source?: "yoco" | "manual";
+  manualPaymentMethod?: string;
+  inventoryApplied?: boolean;
+}
+
+export const VALID_EXPENSE_TYPES = [
+  "materials",
+  "shipping",
+  "marketing",
+  "tools",
+  "other",
+] as const;
+export type ExpenseType = (typeof VALID_EXPENSE_TYPES)[number];
+
+export interface InventoryItem {
+  productId: string;
+  openingStock: number;
+  unitsSold: number;
+  currentStock: number;
+  reorderLevel?: number;
+  updatedAt?: FirebaseFirestore.Timestamp;
+}
+
+export interface Expense {
+  type: ExpenseType;
+  description: string;
+  amount: number;
+  date: FirebaseFirestore.Timestamp;
+  createdAt: FirebaseFirestore.Timestamp;
 }
 
 export async function generateOrderRef(): Promise<string> {
