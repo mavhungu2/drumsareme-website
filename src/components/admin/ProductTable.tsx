@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Trash2 } from "lucide-react";
 import type { ProductListItem } from "@/lib/admin/products-types";
 import { formatDateTime, formatZar } from "@/lib/admin/format";
 
@@ -10,6 +10,52 @@ interface ProductTableProps {
   busyId: string | null;
   onEdit: (product: ProductListItem) => void;
   onDelete: (product: ProductListItem) => void;
+}
+
+type StatusKind = "hidden" | "out" | "low" | "in_stock" | "in_stock_untracked";
+
+interface StatusInfo {
+  kind: StatusKind;
+  label: string;
+  className: string;
+}
+
+function deriveStatus(item: ProductListItem): StatusInfo {
+  if (!item.inStock) {
+    return {
+      kind: "hidden",
+      label: "Hidden",
+      className:
+        "border-gray-200 bg-gray-100 text-gray-700",
+    };
+  }
+  if (!item.inventory) {
+    return {
+      kind: "in_stock_untracked",
+      label: "In stock",
+      className: "border-green/30 bg-green-light/20 text-green",
+    };
+  }
+  const { currentStock, lowStock } = item.inventory;
+  if (currentStock <= 0) {
+    return {
+      kind: "out",
+      label: "Out of stock",
+      className: "border-red-200 bg-red-50 text-red-700",
+    };
+  }
+  if (lowStock) {
+    return {
+      kind: "low",
+      label: `Low (${currentStock})`,
+      className: "border-amber-300 bg-amber-50 text-amber-800",
+    };
+  }
+  return {
+    kind: "in_stock",
+    label: `In stock (${currentStock})`,
+    className: "border-green/30 bg-green-light/20 text-green",
+  };
 }
 
 function EmptyState() {
@@ -77,15 +123,30 @@ export default function ProductTable({
                 {formatZar(item.price)}
               </td>
               <td className="px-4 py-3 align-middle">
-                {item.inStock ? (
-                  <span className="inline-flex items-center rounded-full border border-green/30 bg-green-light/20 px-2.5 py-0.5 text-xs font-medium text-green">
-                    In stock
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                    Hidden
-                  </span>
-                )}
+                {(() => {
+                  const status = deriveStatus(item);
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.className}`}
+                      title={
+                        status.kind === "hidden"
+                          ? "Catalog visibility is off — customers cannot see this product."
+                          : status.kind === "out"
+                            ? "Listed in catalog but inventory is depleted. Customers see a Sold out badge."
+                            : status.kind === "low"
+                              ? "Stock is at or below the reorder level."
+                              : status.kind === "in_stock_untracked"
+                                ? "Listed in catalog. No inventory row yet — set opening stock on the Inventory page."
+                                : "Listed in catalog with stock available."
+                      }
+                    >
+                      {(status.kind === "low" || status.kind === "out") && (
+                        <AlertTriangle size={12} aria-hidden />
+                      )}
+                      {status.label}
+                    </span>
+                  );
+                })()}
               </td>
               <td className="px-4 py-3 align-middle text-right text-sm text-muted tabular-nums">
                 {item.sortOrder}

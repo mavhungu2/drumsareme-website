@@ -1,7 +1,12 @@
 import { onRequest, type Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
 import { logger } from "firebase-functions";
-import { db, FieldValue, type Product } from "./lib/firestore";
+import {
+  db,
+  FieldValue,
+  type InventoryItem,
+  type Product,
+} from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 import { invalidateProductCache } from "./lib/products";
@@ -26,6 +31,18 @@ interface ProductListItem {
   inStock: boolean;
   sortOrder: number;
   updatedAt?: string;
+  /**
+   * Live inventory snapshot for this product. `undefined` when no inventory
+   * row exists yet (admin hasn't seeded the SKU). Used by the admin Products
+   * table to surface real availability instead of just the catalog-visibility
+   * toggle (`inStock`).
+   */
+  inventory?: {
+    currentStock: number;
+    unitsSold: number;
+    reorderLevel: number;
+    lowStock: boolean;
+  };
 }
 
 function parseTail(rawPath: string): string[] {
@@ -60,7 +77,22 @@ function parseJsonBody(
   return { ok: false, error: "Missing JSON body" };
 }
 
-function toListItem(id: string, product: Product): ProductListItem {
+function toInventorySummary(
+  item: InventoryItem,
+): NonNullable<ProductListItem["inventory"]> {
+  return {
+    currentStock: item.currentStock,
+    unitsSold: item.unitsSold,
+    reorderLevel: item.reorderLevel,
+    lowStock: item.currentStock <= item.reorderLevel,
+  };
+}
+
+function toListItem(
+  id: string,
+  product: Product,
+  inventory?: InventoryItem,
+): ProductListItem {
   return {
     id,
     slug: product.slug,
@@ -74,13 +106,24 @@ function toListItem(id: string, product: Product): ProductListItem {
     inStock: product.inStock,
     sortOrder: product.sortOrder,
     updatedAt: toIso(product.updatedAt),
+    inventory: inventory ? toInventorySummary(inventory) : undefined,
   };
 }
 
+async function loadInventoryMap(): Promise<Map<string, InventoryItem>> {
+  const snap = await db.collection("inventory").get();
+  const map = new Map<string, InventoryItem>();
+  snap.forEach((doc) => map.set(doc.id, doc.data() as InventoryItem));
+  return map;
+}
+
 async function listProducts(res: Response): Promise<void> {
-  const snap = await db.collection("products").orderBy("sortOrder").get();
-  const items = snap.docs.map((doc) =>
-    toListItem(doc.id, doc.data() as Product),
+  const [productsSnap, inventoryMap] = await Promise.all([
+    db.collection("products").orderBy("sortOrder").get(),
+    loadInventoryMap(),
+  ]);
+  const items = productsSnap.docs.map((doc) =>
+    toListItem(doc.id, doc.data() as Product, inventoryMap.get(doc.id)),
   );
   res.status(200).json({ items });
 }
@@ -280,8 +323,14 @@ async function createProduct(
   invalidateProductCache();
 
   const saved = await docRef.get();
+  const inventorySnap = await db.collection("inventory").doc(id).get();
+  const inventory = inventorySnap.exists
+    ? (inventorySnap.data() as InventoryItem)
+    : undefined;
   logger.info("adminProducts create", { uid: auth.uid, id });
-  res.status(201).json(toListItem(saved.id, saved.data() as Product));
+  res
+    .status(201)
+    .json(toListItem(saved.id, saved.data() as Product, inventory));
 }
 
 async function patchProduct(
@@ -325,12 +374,18 @@ async function patchProduct(
   invalidateProductCache();
 
   const saved = await docRef.get();
+  const inventorySnap = await db.collection("inventory").doc(id).get();
+  const inventory = inventorySnap.exists
+    ? (inventorySnap.data() as InventoryItem)
+    : undefined;
   logger.info("adminProducts patch", {
     uid: auth.uid,
     id,
     fields: Object.keys(validated.fields),
   });
-  res.status(200).json(toListItem(saved.id, saved.data() as Product));
+  res
+    .status(200)
+    .json(toListItem(saved.id, saved.data() as Product, inventory));
 }
 
 async function deleteProduct(

@@ -11,9 +11,20 @@ export interface ProductListItem {
   description: string;
   features: string[];
   image: string;
+  /**
+   * Catalog visibility toggle set in the admin form. The product table
+   * surfaces *real* availability by combining this with `inventory`.
+   */
   inStock: boolean;
   sortOrder: number;
   updatedAt?: string;
+  /** Live inventory snapshot, present once the SKU has been seeded. */
+  inventory?: {
+    currentStock: number;
+    unitsSold: number;
+    reorderLevel: number;
+    lowStock: boolean;
+  };
 }
 
 export interface ListProductsResponse {
