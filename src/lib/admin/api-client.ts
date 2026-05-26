@@ -39,8 +39,9 @@ import type {
   UpdateProductInput,
 } from "./products-types";
 import type {
-  EditCustomerInput,
-  EditCustomerResponse,
+  ListCustomersResponse,
+  UpdateCustomerInput,
+  UpdateCustomerResponse,
 } from "./customers-types";
 
 export class AdminApiError extends Error {
@@ -463,12 +464,19 @@ export interface ProductImageUploadResponse {
   path: string;
 }
 
-export async function editCustomer(
-  input: EditCustomerInput,
-): Promise<EditCustomerResponse> {
+export async function listCustomers(): Promise<ListCustomersResponse> {
   const url = buildUrl("/api/admin/customers");
-  return requestJson<EditCustomerResponse>(url, {
-    method: "POST",
+  return requestJson<ListCustomersResponse>(url, { method: "GET" });
+}
+
+export async function updateCustomer(
+  id: string,
+  input: UpdateCustomerInput,
+): Promise<UpdateCustomerResponse> {
+  if (!id) throw new AdminApiError(400, "Missing customer id");
+  const url = buildUrl(`/api/admin/customers/${encodeURIComponent(id)}`);
+  return requestJson<UpdateCustomerResponse>(url, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });

@@ -4,20 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import {
   AdminApiError,
-  editCustomer,
-  getAnalytics,
+  listCustomers,
+  updateCustomer,
 } from "@/lib/admin/api-client";
-import type { CustomerAggregate } from "@/lib/admin/analytics-types";
 import type {
-  EditCustomerInput,
-  EditCustomerResponse,
+  CustomerListItem,
+  UpdateCustomerInput,
+  UpdateCustomerResponse,
 } from "@/lib/admin/customers-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import CustomersTable from "@/components/admin/CustomersTable";
 
 export default function AdminCustomersPage() {
   const { user, loading: authLoading } = useAdminAuth();
-  const [customers, setCustomers] = useState<CustomerAggregate[]>([]);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +26,8 @@ export default function AdminCustomersPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getAnalytics();
-      setCustomers(response.customers);
+      const response = await listCustomers();
+      setCustomers(response.items);
     } catch (err) {
       const message =
         err instanceof AdminApiError
@@ -47,11 +47,12 @@ export default function AdminCustomersPage() {
   }, [authLoading, user, refresh]);
 
   const handleEdit = useCallback(
-    async (input: EditCustomerInput): Promise<EditCustomerResponse> => {
-      const response = await editCustomer(input);
-      // Refresh the whole list so re-aggregation reflects post-update state
-      // (the edited row may have merged with an existing customer if email or
-      // phone changed, and sort order by total spend may shift).
+    async (
+      id: string,
+      input: UpdateCustomerInput,
+    ): Promise<UpdateCustomerResponse> => {
+      const response = await updateCustomer(id, input);
+      // Refresh so re-sort by total spend reflects post-update state.
       await refresh();
       return response;
     },
@@ -66,8 +67,9 @@ export default function AdminCustomersPage() {
             Customers
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Aggregated from paid and shipped orders. Sorted by total spend.
-            Editing a row updates every order that customer placed.
+            One row per customer record. Order totals and last-order date are
+            computed from paid, shipped, and completed orders. Editing a row
+            updates every past order&apos;s snapshot for that customer.
           </p>
         </div>
         <button

@@ -2,28 +2,29 @@
 
 import { useState } from "react";
 import { Loader2, Pencil } from "lucide-react";
-import type { CustomerAggregate } from "@/lib/admin/analytics-types";
 import type {
-  EditCustomerInput,
-  EditCustomerResponse,
+  CustomerListItem,
+  UpdateCustomerInput,
+  UpdateCustomerResponse,
 } from "@/lib/admin/customers-types";
 import { formatDateTime, formatZar } from "@/lib/admin/format";
 
 interface CustomersTableProps {
-  customers: CustomerAggregate[];
+  customers: CustomerListItem[];
   loading?: boolean;
-  onEdit: (input: EditCustomerInput) => Promise<EditCustomerResponse>;
+  onEdit: (
+    id: string,
+    input: UpdateCustomerInput,
+  ) => Promise<UpdateCustomerResponse>;
 }
 
 interface EditorState {
-  /** Index in the customers array so we can re-key the row in edit mode. */
-  index: number;
-  /** Original identity used to find matching orders. Never mutated. */
-  identity: { name: string; email: string; phone: string };
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  notes: string;
 }
 
 function EmptyState() {
@@ -47,30 +48,14 @@ function LoadingState() {
   );
 }
 
-function splitFullName(name: string): { firstName: string; lastName: string } {
-  const trimmed = name.trim();
-  if (!trimmed) return { firstName: "", lastName: "" };
-  const lastSpace = trimmed.lastIndexOf(" ");
-  if (lastSpace < 0) return { firstName: trimmed, lastName: "" };
+function toEditor(customer: CustomerListItem): EditorState {
   return {
-    firstName: trimmed.slice(0, lastSpace),
-    lastName: trimmed.slice(lastSpace + 1),
-  };
-}
-
-function toEditor(customer: CustomerAggregate, index: number): EditorState {
-  const { firstName, lastName } = splitFullName(customer.name);
-  return {
-    index,
-    identity: {
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-    },
-    firstName,
-    lastName,
+    id: customer.id,
+    firstName: customer.firstName,
+    lastName: customer.lastName,
     email: customer.email,
     phone: customer.phone,
+    notes: customer.notes ?? "",
   };
 }
 
@@ -86,22 +71,25 @@ function validate(editor: EditorState): string | null {
   return null;
 }
 
-function diffUpdates(editor: EditorState): EditCustomerInput["updates"] {
-  const updates: EditCustomerInput["updates"] = {};
-  const { firstName: origFirst, lastName: origLast } = splitFullName(
-    editor.identity.name,
-  );
-  if (editor.firstName.trim() !== origFirst.trim()) {
+function diffUpdates(
+  editor: EditorState,
+  original: CustomerListItem,
+): UpdateCustomerInput {
+  const updates: UpdateCustomerInput = {};
+  if (editor.firstName.trim() !== original.firstName.trim()) {
     updates.firstName = editor.firstName.trim();
   }
-  if (editor.lastName.trim() !== origLast.trim()) {
+  if (editor.lastName.trim() !== original.lastName.trim()) {
     updates.lastName = editor.lastName.trim();
   }
-  if (editor.email.trim() !== editor.identity.email.trim()) {
+  if (editor.email.trim() !== original.email.trim()) {
     updates.email = editor.email.trim();
   }
-  if (editor.phone.trim() !== editor.identity.phone.trim()) {
+  if (editor.phone.trim() !== original.phone.trim()) {
     updates.phone = editor.phone.trim();
+  }
+  if (editor.notes.trim() !== (original.notes ?? "").trim()) {
+    updates.notes = editor.notes.trim();
   }
   return updates;
 }
@@ -118,8 +106,8 @@ export default function CustomersTable({
   if (loading && customers.length === 0) return <LoadingState />;
   if (!loading && customers.length === 0) return <EmptyState />;
 
-  const startEdit = (customer: CustomerAggregate, index: number) => {
-    setEditing(toEditor(customer, index));
+  const startEdit = (customer: CustomerListItem) => {
+    setEditing(toEditor(customer));
     setError(null);
   };
 
@@ -128,14 +116,14 @@ export default function CustomersTable({
     setError(null);
   };
 
-  const submitEdit = async () => {
+  const submitEdit = async (original: CustomerListItem) => {
     if (!editing) return;
     const validationError = validate(editing);
     if (validationError) {
       setError(validationError);
       return;
     }
-    const updates = diffUpdates(editing);
+    const updates = diffUpdates(editing, original);
     if (Object.keys(updates).length === 0) {
       setEditing(null);
       return;
@@ -143,7 +131,7 @@ export default function CustomersTable({
     setSaving(true);
     setError(null);
     try {
-      await onEdit({ identity: editing.identity, updates });
+      await onEdit(editing.id, updates);
       setEditing(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -167,14 +155,11 @@ export default function CustomersTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {customers.map((customer, index) => {
-            const isEditing = editing?.index === index;
+          {customers.map((customer) => {
+            const isEditing = editing?.id === customer.id;
             if (isEditing && editing) {
               return (
-                <tr
-                  key={`edit-${customer.email}-${customer.phone}-${index}`}
-                  className="bg-surface/50"
-                >
+                <tr key={`edit-${customer.id}`} className="bg-surface/50">
                   <td className="px-4 py-3 align-middle">
                     <div className="flex flex-col gap-2">
                       <div className="grid grid-cols-2 gap-2">
@@ -199,6 +184,16 @@ export default function CustomersTable({
                           className="h-9 rounded-lg border border-border bg-background px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         />
                       </div>
+                      <input
+                        type="text"
+                        value={editing.notes}
+                        onChange={(e) =>
+                          setEditing({ ...editing, notes: e.target.value })
+                        }
+                        placeholder="Internal notes"
+                        aria-label="Internal notes"
+                        className="h-9 rounded-lg border border-border bg-background px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      />
                     </div>
                   </td>
                   <td className="px-4 py-3 align-middle">
@@ -231,15 +226,12 @@ export default function CustomersTable({
                   <td className="px-4 py-3 align-middle text-right text-sm text-muted tabular-nums">
                     {formatZar(customer.totalSpend)}
                   </td>
-                  <td
-                    colSpan={2}
-                    className="px-4 py-3 align-middle"
-                  >
+                  <td colSpan={2} className="px-4 py-3 align-middle">
                     <div className="flex flex-col items-start gap-2">
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={submitEdit}
+                          onClick={() => submitEdit(customer)}
                           disabled={saving}
                           className="inline-flex h-9 items-center gap-2 rounded-lg bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         >
@@ -262,7 +254,8 @@ export default function CustomersTable({
                         </button>
                       </div>
                       <p className="text-xs text-muted">
-                        Updates every order belonging to this customer.
+                        Identity changes also update every past order&apos;s
+                        snapshot.
                       </p>
                       {error && (
                         <p role="alert" className="text-xs text-red-700">
@@ -274,13 +267,19 @@ export default function CustomersTable({
                 </tr>
               );
             }
+            const fullName =
+              `${customer.firstName} ${customer.lastName}`.trim() || "—";
             return (
-              <tr
-                key={`${customer.email}-${customer.phone}-${index}`}
-                className="hover:bg-surface"
-              >
+              <tr key={customer.id} className="hover:bg-surface">
                 <td className="px-4 py-3 align-middle text-sm text-foreground">
-                  {customer.name || "—"}
+                  <div className="flex flex-col">
+                    <span>{fullName}</span>
+                    {customer.notes ? (
+                      <span className="text-xs text-muted truncate max-w-[20rem]">
+                        {customer.notes}
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-4 py-3 align-middle text-sm text-muted">
                   {customer.phone || "—"}
@@ -300,8 +299,8 @@ export default function CustomersTable({
                 <td className="px-4 py-3 align-middle">
                   <button
                     type="button"
-                    onClick={() => startEdit(customer, index)}
-                    aria-label={`Edit ${customer.name || "customer"}`}
+                    onClick={() => startEdit(customer)}
+                    aria-label={`Edit ${fullName}`}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <Pencil size={14} aria-hidden />

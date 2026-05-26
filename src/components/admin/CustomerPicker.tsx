@@ -9,8 +9,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import { Search, UserPlus, X } from "lucide-react";
-import { getAnalytics } from "@/lib/admin/api-client";
-import type { CustomerAggregate } from "@/lib/admin/analytics-types";
+import { listCustomers } from "@/lib/admin/api-client";
+import type { CustomerListItem } from "@/lib/admin/customers-types";
 import { formatZar } from "@/lib/admin/format";
 
 export interface PickerCustomer {
@@ -30,26 +30,23 @@ interface CustomerPickerProps {
   selected: PickerCustomer | null;
 }
 
-function splitFullName(name: string): { firstName: string; lastName: string } {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length <= 1) return { firstName: parts[0] ?? "", lastName: "" };
-  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
-}
-
-function customerToPicker(c: CustomerAggregate): PickerCustomer {
-  const { firstName, lastName } = splitFullName(c.name);
+function customerToPicker(c: CustomerListItem): PickerCustomer {
   return {
-    firstName,
-    lastName,
+    firstName: c.firstName,
+    lastName: c.lastName,
     phone: c.phone ?? "",
     email: c.email ?? "",
   };
 }
 
-function matches(query: string, c: CustomerAggregate): boolean {
+function customerDisplayName(c: CustomerListItem): string {
+  return `${c.firstName} ${c.lastName}`.trim();
+}
+
+function matches(query: string, c: CustomerListItem): boolean {
   const q = query.toLowerCase();
   return (
-    c.name.toLowerCase().includes(q) ||
+    customerDisplayName(c).toLowerCase().includes(q) ||
     (c.email ?? "").toLowerCase().includes(q) ||
     (c.phone ?? "").toLowerCase().includes(q)
   );
@@ -62,7 +59,7 @@ export default function CustomerPicker({
   const inputId = useId();
   const listboxId = useId();
 
-  const [customers, setCustomers] = useState<CustomerAggregate[]>([]);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -71,10 +68,10 @@ export default function CustomerPicker({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getAnalytics()
+    listCustomers()
       .then((response) => {
         if (cancelled) return;
-        setCustomers(response.customers ?? []);
+        setCustomers(response.items ?? []);
       })
       .catch(() => {
         // Fail open — admin can still type a fresh customer.
@@ -96,7 +93,7 @@ export default function CustomerPicker({
   }, [customers, query]);
 
   const handleSelect = useCallback(
-    (c: CustomerAggregate) => {
+    (c: CustomerListItem) => {
       onPick(customerToPicker(c));
       setOpen(false);
       setQuery("");
@@ -200,7 +197,7 @@ export default function CustomerPicker({
           className="absolute left-0 right-0 z-10 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-background shadow-lg"
         >
           {filtered.map((c, i) => {
-            const fullName = c.name || "—";
+            const fullName = customerDisplayName(c) || "—";
             const meta = [
               c.phone || null,
               c.email || null,
@@ -212,7 +209,7 @@ export default function CustomerPicker({
               .filter(Boolean)
               .join(" · ");
             return (
-              <li key={`${c.email}-${c.phone}-${i}`} role="option" aria-selected={i === highlight}>
+              <li key={c.id} role="option" aria-selected={i === highlight}>
                 <button
                   type="button"
                   onMouseDown={(e) => {

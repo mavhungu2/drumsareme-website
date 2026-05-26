@@ -14,6 +14,7 @@ import {
 } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
+import { findOrCreateCustomer } from "./lib/customers";
 import { InsufficientStockError } from "./lib/errors";
 import { getServerProduct } from "./lib/products";
 import { sendCustomerInvoice } from "./lib/resend";
@@ -308,6 +309,20 @@ async function createManualSale(
     ...(input.notes ? { notes: input.notes } : {}),
   };
 
+  // Link this order to its canonical customer record. Matches existing
+  // customer by email or phone; creates a new one when no match exists.
+  const customerId = await findOrCreateCustomer({
+    firstName: customer.firstName,
+    lastName: customer.lastName,
+    email: customer.email,
+    phone: customer.phone,
+    addressLine1: customer.addressLine1,
+    suburb: customer.suburb,
+    city: customer.city,
+    province: customer.province,
+    postalCode: customer.postalCode,
+  });
+
   // Pending draft: fulfilment + delivery fee captured up front so the
   // emailed invoice has the right total. Payment method and the inventory
   // decrement are still deferred to the Mark as Paid action.
@@ -322,6 +337,7 @@ async function createManualSale(
     subtotal,
     shipping: input.deliveryFee,
     total,
+    customerId,
     customer,
     yoco: { checkoutId: "" },
     createdAt: FieldValue.serverTimestamp(),

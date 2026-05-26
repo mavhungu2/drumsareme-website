@@ -73,6 +73,12 @@ export interface Order {
   subtotal: number;
   shipping: number;
   total: number;
+  /**
+   * Link to the canonical record in `customers/{customerId}`. Populated on
+   * every new order (manual or Yoco). Legacy orders without this field are
+   * still grouped by the analytics email|phone|name key.
+   */
+  customerId?: string;
   customer: Customer;
   yoco: {
     checkoutId: string;
@@ -112,6 +118,39 @@ export interface Product {
   image: string;
   inStock: boolean;
   sortOrder: number;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
+/**
+ * Canonical customer record. Each order references this via `order.customerId`
+ * while still keeping a denormalized `order.customer` snapshot so historical
+ * invoices/shipping records remain accurate.
+ *
+ * `emailLower` and `phoneDigits` are normalized lookup fields used to match
+ * existing customers at checkout / manual sale time. They're maintained by
+ * callers of `findOrCreateCustomer`.
+ */
+export interface CustomerRecord {
+  firstName: string;
+  lastName: string;
+  email: string;
+  emailLower: string;
+  phone: string;
+  phoneDigits: string;
+  /**
+   * Most recently observed delivery address. Used as a default when creating
+   * a new order for this customer. Order-level addresses are still recorded
+   * on each order; this is purely a convenience.
+   */
+  defaultAddress?: {
+    addressLine1?: string;
+    suburb?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
+  };
+  notes?: string;
+  createdAt: FirebaseFirestore.Timestamp;
   updatedAt: FirebaseFirestore.Timestamp;
 }
 

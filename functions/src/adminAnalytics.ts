@@ -118,6 +118,10 @@ function paymentKey(order: Order): keyof PaymentBreakdown {
 }
 
 function customerKeyFor(order: Order): string {
+  // Prefer the canonical customerId once it's been backfilled. Falls back to
+  // the legacy email|phone|name composite key for orders that pre-date the
+  // normalize-customers migration.
+  if (order.customerId) return `id:${order.customerId}`;
   const email = order.customer.email?.trim().toLowerCase();
   if (email) return `email:${email}`;
   const phone = order.customer.phone?.replace(/\s+/g, "");

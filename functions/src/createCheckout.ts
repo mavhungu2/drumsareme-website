@@ -10,6 +10,7 @@ import {
   type InventoryItem,
   type OrderItem,
 } from "./lib/firestore";
+import { findOrCreateCustomer } from "./lib/customers";
 import {
   getServerProduct,
   SHIPPING_FLAT_ZAR,
@@ -170,6 +171,20 @@ export const createCheckout = onRequest(
     const orderDoc = db.collection("orders").doc();
     const orderId = orderDoc.id;
 
+    // Link this order to its canonical customer record. Matches existing
+    // customer by email or phone; creates a new one when no match exists.
+    const customerId = await findOrCreateCustomer({
+      firstName: validated.customer.firstName,
+      lastName: validated.customer.lastName,
+      email: validated.customer.email,
+      phone: validated.customer.phone,
+      addressLine1: validated.customer.addressLine1,
+      suburb: validated.customer.suburb,
+      city: validated.customer.city,
+      province: validated.customer.province,
+      postalCode: validated.customer.postalCode,
+    });
+
     const siteUrl = SITE_URL.value();
     try {
       const checkout = await createYocoCheckout(YOCO_SECRET_KEY.value(), {
@@ -190,6 +205,7 @@ export const createCheckout = onRequest(
         subtotal,
         shipping,
         total,
+        customerId,
         customer: validated.customer,
         yoco: { checkoutId: checkout.id },
         createdAt: FieldValue.serverTimestamp(),
