@@ -38,6 +38,10 @@ import type {
   ProductListItem,
   UpdateProductInput,
 } from "./products-types";
+import type {
+  EditCustomerInput,
+  EditCustomerResponse,
+} from "./customers-types";
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -457,6 +461,17 @@ export async function deleteProduct(
 export interface ProductImageUploadResponse {
   url: string;
   path: string;
+}
+
+export async function editCustomer(
+  input: EditCustomerInput,
+): Promise<EditCustomerResponse> {
+  const url = buildUrl("/api/admin/customers");
+  return requestJson<EditCustomerResponse>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export async function uploadProductImage(

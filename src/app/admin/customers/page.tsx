@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, RefreshCcw } from "lucide-react";
-import { AdminApiError, getAnalytics } from "@/lib/admin/api-client";
+import {
+  AdminApiError,
+  editCustomer,
+  getAnalytics,
+} from "@/lib/admin/api-client";
 import type { CustomerAggregate } from "@/lib/admin/analytics-types";
+import type {
+  EditCustomerInput,
+  EditCustomerResponse,
+} from "@/lib/admin/customers-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import CustomersTable from "@/components/admin/CustomersTable";
 
@@ -38,6 +46,18 @@ export default function AdminCustomersPage() {
     void refresh();
   }, [authLoading, user, refresh]);
 
+  const handleEdit = useCallback(
+    async (input: EditCustomerInput): Promise<EditCustomerResponse> => {
+      const response = await editCustomer(input);
+      // Refresh the whole list so re-aggregation reflects post-update state
+      // (the edited row may have merged with an existing customer if email or
+      // phone changed, and sort order by total spend may shift).
+      await refresh();
+      return response;
+    },
+    [refresh],
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -47,6 +67,7 @@ export default function AdminCustomersPage() {
           </h1>
           <p className="mt-1 text-sm text-muted">
             Aggregated from paid and shipped orders. Sorted by total spend.
+            Editing a row updates every order that customer placed.
           </p>
         </div>
         <button
@@ -71,7 +92,11 @@ export default function AdminCustomersPage() {
         </div>
       )}
 
-      <CustomersTable customers={customers} loading={loading} />
+      <CustomersTable
+        customers={customers}
+        loading={loading}
+        onEdit={handleEdit}
+      />
     </div>
   );
 }
