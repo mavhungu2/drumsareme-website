@@ -77,10 +77,12 @@ async function lookupByPhone(
  * id when found (by email or phone), otherwise creates a new customer doc
  * and returns its id.
  *
- * On match, identity fields (name / email / phone) are NOT overwritten — the
- * admin's curated values stay authoritative. The customer's `defaultAddress`
- * IS refreshed when the new snapshot includes a delivery address, since
- * that's the most recently observed shipping target.
+ * On match: non-blank identity fields (name / email / phone) are NOT
+ * overwritten — the admin's curated values stay authoritative. BLANK fields
+ * are filled in from the snapshot when available, so a customer record that
+ * was first created from a no-email order picks up the email next time the
+ * same person checks out with one. `defaultAddress` is always refreshed when
+ * the new snapshot includes a delivery address.
  */
 export async function findOrCreateCustomer(
   snapshot: CustomerSnapshot,
@@ -88,19 +90,42 @@ export async function findOrCreateCustomer(
   const emailLower = normalizeEmailLower(snapshot.email);
   const phoneDigits = normalizePhoneDigits(snapshot.phone);
 
-  const existing =
+  const existingId =
     (await lookupByEmail(emailLower)) ?? (await lookupByPhone(phoneDigits));
 
   const address = buildDefaultAddress(snapshot);
 
-  if (existing) {
-    // Refresh updatedAt + defaultAddress if we have one. Leave identity alone.
+  if (existingId) {
+    const ref = db.doc(`customers/${existingId}`);
+    const existingSnap = await ref.get();
+    const existing = existingSnap.data() as CustomerRecord | undefined;
+
     const updates: Record<string, unknown> = {
       updatedAt: FieldValue.serverTimestamp(),
     };
     if (address) updates.defaultAddress = address;
-    await db.doc(`customers/${existing}`).set(updates, { merge: true });
-    return existing;
+
+    // Backfill blanks: if the record is missing identity values that the new
+    // snapshot provides, fill them in. Never overwrites an existing non-blank.
+    if (existing) {
+      if (!existing.email && snapshot.email && snapshot.email.trim()) {
+        updates.email = snapshot.email.trim();
+        updates.emailLower = emailLower;
+      }
+      if (!existing.phone && snapshot.phone && snapshot.phone.trim()) {
+        updates.phone = snapshot.phone.trim();
+        updates.phoneDigits = phoneDigits;
+      }
+      if (!existing.firstName && snapshot.firstName) {
+        updates.firstName = snapshot.firstName;
+      }
+      if (!existing.lastName && snapshot.lastName) {
+        updates.lastName = snapshot.lastName;
+      }
+    }
+
+    await ref.set(updates, { merge: true });
+    return existingId;
   }
 
   const ref = db.collection("customers").doc();
