@@ -8,6 +8,7 @@ import {
   Loader2,
   LogOut,
   Package,
+  Percent,
   PlusCircle,
   Receipt,
   ShoppingBag,
@@ -65,6 +66,12 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
     label: "Customers",
     icon: Users2,
     match: (pathname) => pathname.startsWith("/admin/customers"),
+  },
+  {
+    href: "/admin/promos/",
+    label: "Promo codes",
+    icon: Percent,
+    match: (pathname) => pathname.startsWith("/admin/promos"),
   },
   {
     href: "/admin/expenses/",

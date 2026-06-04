@@ -72,12 +72,18 @@ function fulfilmentBlockHtml(order: Order): string {
 
 function orderBodyHtml(order: Order, intro: string): string {
   const shippingLabel = order.fulfilment === "collection" ? "Collection" : "Shipping";
+  const discount = order.discount ?? 0;
+  const discountRow =
+    discount > 0
+      ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
+      : "";
   return emailContainer(`
     <h2 style="margin:0 0 8px">${intro}</h2>
     <p style="color:#6b7280;margin:0 0 24px">Order <strong>${order.ref}</strong></p>
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       ${itemsHtml(order)}
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
+      ${discountRow}
       <tr><td style="padding:6px 0">${shippingLabel}</td><td style="padding:6px 0;text-align:right">${order.fulfilment === "collection" ? "Free" : formatZAR(order.shipping)}</td></tr>
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
     </table>
@@ -87,6 +93,15 @@ function orderBodyHtml(order: Order, intro: string): string {
 }
 
 function invoiceBodyHtml(order: Order): string {
+  const discount = order.discount ?? 0;
+  const discountRow =
+    discount > 0
+      ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
+      : "";
+  const shippingRow =
+    order.shipping > 0
+      ? `<tr><td style="padding:6px 0">${order.fulfilment === "collection" ? "Collection" : "Shipping"}</td><td style="padding:6px 0;text-align:right">${formatZAR(order.shipping)}</td></tr>`
+      : "";
   return emailContainer(`
     <h2 style="margin:0 0 8px">Here's your invoice</h2>
     <p style="color:#6b7280;margin:0 0 16px">Order <strong>${order.ref}</strong></p>
@@ -94,6 +109,8 @@ function invoiceBodyHtml(order: Order): string {
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       ${itemsHtml(order)}
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
+      ${discountRow}
+      ${shippingRow}
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total due</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
     </table>
     ${

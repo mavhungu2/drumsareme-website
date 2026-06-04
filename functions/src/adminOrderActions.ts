@@ -574,7 +574,11 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
         }
       });
 
-      const total = (order.subtotal ?? 0) + input.deliveryFee;
+      // Preserve any promo-code discount stored at order creation. Discount
+      // applies to subtotal; the new delivery fee is added on top.
+      const discount = order.discount ?? 0;
+      const total =
+        Math.max(0, (order.subtotal ?? 0) - discount) + input.deliveryFee;
       // Collection orders skip the "shipped" step — the moment the customer
       // pays the goods are ready at Spring Glade. Stamp shippedAt alongside
       // paidAt so the timeline reflects both events.
@@ -592,6 +596,14 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
         transitionUpdates.shippedAt = FieldValue.serverTimestamp();
       }
       tx.update(orderRef, transitionUpdates);
+
+      // Track promo redemption inside the same transaction.
+      if (order.promoCode) {
+        tx.update(db.doc(`promoCodes/${order.promoCode}`), {
+          redemptionCount: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
 
       return { kind: "ok" };
     });

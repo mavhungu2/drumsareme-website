@@ -214,6 +214,17 @@ export default function Invoice({ order }: InvoiceProps) {
             <span className="text-gray-600">Subtotal</span>
             <span className="tabular-nums">{formatZar(order.subtotal)}</span>
           </div>
+          {(order.discount ?? 0) > 0 && (
+            <div className="flex justify-between text-green-700">
+              <span>
+                Promo
+                {order.promoCode ? ` (${order.promoCode})` : ""}
+              </span>
+              <span className="tabular-nums">
+                −{formatZar(order.discount ?? 0)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-gray-600">
               {order.fulfilment === "collection"

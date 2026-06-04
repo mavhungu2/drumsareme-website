@@ -15,6 +15,7 @@ import {
   getServerProduct,
   SHIPPING_FLAT_ZAR,
 } from "./lib/products";
+import { validatePromoCode } from "./lib/promo";
 import { createYocoCheckout } from "./lib/yoco";
 
 const YOCO_SECRET_KEY = defineSecret("YOCO_SECRET_KEY");
@@ -38,6 +39,7 @@ interface CheckoutRequest {
   items: CheckoutRequestItem[];
   customer: Customer;
   fulfilment?: Fulfilment;
+  promoCode?: string;
 }
 
 function applyCors(req: { get: (h: string) => string | undefined }, res: {
@@ -91,7 +93,14 @@ function validate(body: unknown): CheckoutRequest | string {
     }
   }
   if (!/^\S+@\S+\.\S+$/.test(c.email)) return "Invalid email";
-  return { ...(b as CheckoutRequest), fulfilment };
+  const result: CheckoutRequest = { ...(b as CheckoutRequest), fulfilment };
+  if (b.promoCode !== undefined) {
+    if (typeof b.promoCode !== "string") return "Invalid promoCode";
+    const code = b.promoCode.trim();
+    if (code.length > 30) return "Invalid promoCode";
+    result.promoCode = code;
+  }
+  return result;
 }
 
 export const createCheckout = onRequest(
@@ -165,7 +174,27 @@ export const createCheckout = onRequest(
 
     const fulfilment: Fulfilment = validated.fulfilment ?? "delivery";
     const shipping = fulfilment === "collection" ? 0 : SHIPPING_FLAT_ZAR;
-    const total = subtotal + shipping;
+
+    // Apply promo code (server-side validation — never trust the client's
+    // discount). Rejects the whole order if the code is bad; the UI is
+    // expected to have pre-validated, so this is the belt-and-braces gate.
+    let discount = 0;
+    let promoCode: string | undefined;
+    if (validated.promoCode) {
+      const promoResult = await validatePromoCode({
+        code: validated.promoCode,
+        subtotal,
+        email: validated.customer.email,
+      });
+      if (!promoResult.ok) {
+        res.status(400).json({ error: promoResult.error });
+        return;
+      }
+      discount = promoResult.discount;
+      promoCode = promoResult.code;
+    }
+
+    const total = Math.max(0, subtotal - discount) + shipping;
 
     const ref = await generateOrderRef();
     const orderDoc = db.collection("orders").doc();
@@ -203,6 +232,8 @@ export const createCheckout = onRequest(
         fulfilment,
         items,
         subtotal,
+        ...(discount > 0 ? { discount } : {}),
+        ...(promoCode ? { promoCode } : {}),
         shipping,
         total,
         customerId,

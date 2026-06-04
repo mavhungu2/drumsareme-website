@@ -9,6 +9,8 @@ export { adminExpenses } from "./adminExpenses";
 export { adminAnalytics } from "./adminAnalytics";
 export { adminCustomers } from "./adminCustomers";
 export { adminManualSales } from "./adminManualSales";
+export { adminPromos } from "./adminPromos";
+export { validatePromo } from "./validatePromo";
 export { adminProducts } from "./adminProducts";
 export { adminUploadProductImage } from "./adminUploadProductImage";
 export { productsAutoRedeploy } from "./productsAutoRedeploy";

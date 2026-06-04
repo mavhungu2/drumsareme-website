@@ -43,6 +43,12 @@ import type {
   UpdateCustomerInput,
   UpdateCustomerResponse,
 } from "./customers-types";
+import type {
+  CreatePromoInput,
+  ListPromosResponse,
+  PromoListItem,
+  UpdatePromoInput,
+} from "./promos-types";
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -480,6 +486,43 @@ export async function updateCustomer(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function listPromos(): Promise<ListPromosResponse> {
+  const url = buildUrl("/api/admin/promos");
+  return requestJson<ListPromosResponse>(url, { method: "GET" });
+}
+
+export async function createPromo(
+  input: CreatePromoInput,
+): Promise<PromoListItem> {
+  const url = buildUrl("/api/admin/promos");
+  return requestJson<PromoListItem>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updatePromo(
+  code: string,
+  input: UpdatePromoInput,
+): Promise<PromoListItem> {
+  if (!code) throw new AdminApiError(400, "Missing promo code");
+  const url = buildUrl(`/api/admin/promos/${encodeURIComponent(code)}`);
+  return requestJson<PromoListItem>(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deletePromo(
+  code: string,
+): Promise<{ ok: true; code: string }> {
+  if (!code) throw new AdminApiError(400, "Missing promo code");
+  const url = buildUrl(`/api/admin/promos/${encodeURIComponent(code)}`);
+  return requestJson<{ ok: true; code: string }>(url, { method: "DELETE" });
 }
 
 export async function uploadProductImage(

@@ -131,6 +131,15 @@ export const yocoWebhook = onRequest(
           paidAt: FieldValue.serverTimestamp(),
           "yoco.paymentId": event.payload?.id ?? null,
         });
+        // Track promo redemption in the same transaction so the counter is
+        // consistent with the paid-status flip. Tiny overshoot window remains
+        // for concurrent payments; acceptable for a small shop.
+        if (current.promoCode) {
+          tx.update(db.doc(`promoCodes/${current.promoCode}`), {
+            redemptionCount: FieldValue.increment(1),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
       });
       const paidOrder: Order = { ...order, status: "paid" };
       try {

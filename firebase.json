@@ -20,6 +20,9 @@
       { "source": "/api/admin/products", "function": "adminProducts" },
       { "source": "/api/admin/products/**", "function": "adminProducts" },
       { "source": "/api/admin/uploads/product-image", "function": "adminUploadProductImage" },
+      { "source": "/api/admin/promos", "function": "adminPromos" },
+      { "source": "/api/admin/promos/**", "function": "adminPromos" },
+      { "source": "/api/promo/validate", "function": "validatePromo" },
       { "source": "/api/orders/**", "function": "getOrder" }
     ],
     "headers": [

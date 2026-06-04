@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Lock, MapPin, Truck } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Lock, MapPin, Tag, Truck, X } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { SHIPPING_FLAT_ZAR } from "@/lib/products";
+import { validatePromo, type PromoValidateOk } from "@/lib/promo";
 
 type Fulfilment = "delivery" | "collection";
 
@@ -64,11 +65,16 @@ export default function CheckoutPage() {
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoApplied, setPromoApplied] = useState<PromoValidateOk | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   const subtotal = totalPrice;
   const shipping =
     fulfilment === "collection" || items.length === 0 ? 0 : SHIPPING_FLAT_ZAR;
-  const total = subtotal + shipping;
+  const discount = promoApplied ? Math.min(promoApplied.discount, subtotal) : 0;
+  const total = Math.max(0, subtotal - discount) + shipping;
 
   if (items.length === 0) {
     return (
@@ -88,6 +94,37 @@ export default function CheckoutPage() {
   const update = (key: keyof Customer) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => setCustomer((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const applyPromo = async () => {
+    setPromoError(null);
+    const code = promoInput.trim();
+    if (!code) {
+      setPromoError("Enter a code");
+      return;
+    }
+    setPromoValidating(true);
+    try {
+      const result = await validatePromo({
+        code,
+        subtotal,
+        email: customer.email.trim() || undefined,
+      });
+      if (!result.ok) {
+        setPromoApplied(null);
+        setPromoError(result.error);
+        return;
+      }
+      setPromoApplied(result);
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
+  const removePromo = () => {
+    setPromoApplied(null);
+    setPromoInput("");
+    setPromoError(null);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +152,7 @@ export default function CheckoutPage() {
           items: items.map((i) => ({ id: i.product.id, qty: i.quantity })),
           customer: customerPayload,
           fulfilment,
+          ...(promoApplied ? { promoCode: promoApplied.code } : {}),
         }),
       });
       const data = await res.json();
@@ -347,6 +385,12 @@ export default function CheckoutPage() {
                   <span className="text-muted">Subtotal</span>
                   <span>R{subtotal.toLocaleString("en-ZA")}</span>
                 </div>
+                {promoApplied && discount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Promo ({promoApplied.code})</span>
+                    <span>−R{discount.toLocaleString("en-ZA")}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted">
                     {fulfilment === "collection" ? "Collection" : "Shipping"}
@@ -363,6 +407,63 @@ export default function CheckoutPage() {
                     R{total.toLocaleString("en-ZA")}
                   </span>
                 </div>
+              </div>
+
+              {/* Promo code panel */}
+              <div className="mt-5 border-t border-border pt-4">
+                {promoApplied ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-sm">
+                    <span className="inline-flex items-center gap-2 text-green-800">
+                      <Check size={14} aria-hidden />
+                      <span className="font-medium">{promoApplied.code}</span>
+                      <span className="text-green-700 text-xs">
+                        {promoApplied.kind === "percent"
+                          ? `${promoApplied.value}% off`
+                          : `R${promoApplied.value} off`}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={removePromo}
+                      aria-label="Remove promo code"
+                      className="text-green-700 hover:text-green-900"
+                    >
+                      <X size={14} aria-hidden />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium text-muted inline-flex items-center gap-1.5">
+                      <Tag size={12} aria-hidden /> Promo code
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoInput}
+                        onChange={(e) => {
+                          setPromoInput(e.target.value.toUpperCase());
+                          setPromoError(null);
+                        }}
+                        placeholder="e.g. LAUNCH15"
+                        className="flex-1 h-10 rounded-lg border border-border bg-white px-3 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPromo}
+                        disabled={promoValidating || !promoInput.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-sm font-medium hover:bg-surface disabled:opacity-50"
+                      >
+                        {promoValidating && (
+                          <Loader2 size={14} className="animate-spin" aria-hidden />
+                        )}
+                        Apply
+                      </button>
+                    </div>
+                    {promoError && (
+                      <p className="text-xs text-red-600">{promoError}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {error && (

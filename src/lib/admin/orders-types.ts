@@ -81,6 +81,10 @@ export interface Order {
   inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;
+  /** ZAR discounted from subtotal via promoCode. Default 0 when omitted. */
+  discount?: number;
+  /** Uppercased promo code applied to this order. */
+  promoCode?: string;
   shipping: number;
   total: number;
   customer: Customer;

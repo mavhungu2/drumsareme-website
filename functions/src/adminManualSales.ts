@@ -17,6 +17,7 @@ import { applyCors } from "./lib/cors";
 import { findOrCreateCustomer } from "./lib/customers";
 import { InsufficientStockError } from "./lib/errors";
 import { getServerProduct } from "./lib/products";
+import { validatePromoCode } from "./lib/promo";
 import { sendCustomerInvoice } from "./lib/resend";
 
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
@@ -46,6 +47,7 @@ interface ManualSaleInput {
   fulfilment: Fulfilment;
   deliveryFee: number;
   notes?: string;
+  promoCode?: string;
 }
 
 const MAX_ADDRESS_LEN = 200;
@@ -98,10 +100,22 @@ function validate(
     fulfilment: rawFulfilment,
     deliveryFee,
     notes,
+    promoCode,
     ...extra
   } = body;
   if (Object.keys(extra).length > 0) {
     return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+  let promoCodeClean: string | undefined;
+  if (promoCode !== undefined) {
+    if (typeof promoCode !== "string") {
+      return { ok: false, error: "promoCode must be a string" };
+    }
+    const trimmed = promoCode.trim();
+    if (trimmed.length > 30) {
+      return { ok: false, error: "promoCode too long" };
+    }
+    if (trimmed.length > 0) promoCodeClean = trimmed;
   }
 
   let fulfilment: Fulfilment = "delivery";
@@ -225,6 +239,7 @@ function validate(
       fulfilment,
       deliveryFee: deliveryFeeClean,
       notes: notesClean,
+      promoCode: promoCodeClean,
     },
   };
 }
@@ -323,10 +338,27 @@ async function createManualSale(
     postalCode: customer.postalCode,
   });
 
+  // Apply promo code if one was supplied (re-validates server-side).
+  let discount = 0;
+  let promoCode: string | undefined;
+  if (input.promoCode) {
+    const promoResult = await validatePromoCode({
+      code: input.promoCode,
+      subtotal,
+      email: customer.email,
+    });
+    if (!promoResult.ok) {
+      res.status(400).json({ error: promoResult.error });
+      return;
+    }
+    discount = promoResult.discount;
+    promoCode = promoResult.code;
+  }
+
   // Pending draft: fulfilment + delivery fee captured up front so the
   // emailed invoice has the right total. Payment method and the inventory
   // decrement are still deferred to the Mark as Paid action.
-  const total = subtotal + input.deliveryFee;
+  const total = Math.max(0, subtotal - discount) + input.deliveryFee;
   await orderDoc.set({
     ref,
     status: "pending",
@@ -335,6 +367,8 @@ async function createManualSale(
     inventoryApplied: false,
     items: orderItems,
     subtotal,
+    ...(discount > 0 ? { discount } : {}),
+    ...(promoCode ? { promoCode } : {}),
     shipping: input.deliveryFee,
     total,
     customerId,

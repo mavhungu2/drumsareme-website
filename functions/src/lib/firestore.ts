@@ -71,6 +71,14 @@ export interface Order {
   inventoryApplied?: boolean;
   items: OrderItem[];
   subtotal: number;
+  /**
+   * ZAR amount discounted from `subtotal` via a promo code. `total` already
+   * reflects this. Always 0 when no code was applied (or omitted on legacy
+   * orders that pre-date promo codes — readers must treat `undefined` as 0).
+   */
+  discount?: number;
+  /** Promo code used on this order, uppercased. Matches `promoCodes/{code}`. */
+  promoCode?: string;
   shipping: number;
   total: number;
   /**
@@ -149,6 +157,37 @@ export interface CustomerRecord {
     province?: string;
     postalCode?: string;
   };
+  notes?: string;
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export type PromoCodeKind = "percent" | "fixed";
+
+/**
+ * A redeemable promo code. The doc id IS the code (uppercased) so lookups
+ * are O(1). Validation lives in `lib/promo.ts` and is shared by the public
+ * validate endpoint, createCheckout, and adminManualSales — never trust the
+ * client-supplied discount, always recompute server-side.
+ *
+ * `redemptionCount` is incremented atomically when an order transitions to
+ * `paid` (Yoco webhook + admin mark-paid). A small race window exists where
+ * two near-simultaneous payments can overshoot `maxRedemptions` by one or
+ * two; acceptable for a small shop. Hard caps would need a reservation
+ * counter at checkout time.
+ */
+export interface PromoCode {
+  code: string;
+  kind: PromoCodeKind;
+  /** For "percent": 1..100. For "fixed": ZAR amount. */
+  value: number;
+  active: boolean;
+  startsAt?: FirebaseFirestore.Timestamp;
+  expiresAt?: FirebaseFirestore.Timestamp;
+  maxRedemptions?: number;
+  redemptionCount: number;
+  /** Only customers with no prior paid|shipped|completed orders qualify. */
+  firstOrderOnly?: boolean;
   notes?: string;
   createdAt: FirebaseFirestore.Timestamp;
   updatedAt: FirebaseFirestore.Timestamp;

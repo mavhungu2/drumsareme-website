@@ -320,6 +320,17 @@ export default function OrderDetailView({
                   {formatZar(order.subtotal)}
                 </td>
               </tr>
+              {(order.discount ?? 0) > 0 && (
+                <tr>
+                  <td colSpan={3} className="py-2 text-right text-green-700">
+                    Promo
+                    {order.promoCode ? ` (${order.promoCode})` : ""}
+                  </td>
+                  <td className="py-2 text-right tabular-nums text-green-700">
+                    −{formatZar(order.discount ?? 0)}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td colSpan={3} className="py-2 text-right text-muted">
                   Shipping

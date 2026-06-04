@@ -423,6 +423,18 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
       width: totalsValueWidth,
       align: "right",
     });
+    const discount = order.discount ?? 0;
+    if (discount > 0) {
+      tY = doc.y + 4;
+      const promoLabel = order.promoCode
+        ? `Promo (${order.promoCode})`
+        : "Promo";
+      doc.fillColor("#047857").text(promoLabel, totalsLabelX, tY);
+      doc.fillColor("#047857").text(`-${formatZAR(discount)}`, totalsValueX, tY, {
+        width: totalsValueWidth,
+        align: "right",
+      });
+    }
     tY = doc.y + 4;
     const shippingLabel =
       order.fulfilment === "collection"
