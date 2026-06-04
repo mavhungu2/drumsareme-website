@@ -14,7 +14,7 @@ export interface ServerProduct {
   price: number;
 }
 
-export const SHIPPING_FLAT_ZAR = 100;
+export const SHIPPING_FLAT_ZAR = 120;
 
 const CACHE_TTL_MS = 30_000;
 

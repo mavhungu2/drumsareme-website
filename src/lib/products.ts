@@ -68,4 +68,4 @@ function uniqueOrdered<T>(values: ReadonlyArray<T>): readonly T[] {
 export const sizes = uniqueOrdered(products.map((p) => p.size));
 export const colors = uniqueOrdered(products.map((p) => p.color));
 
-export const SHIPPING_FLAT_ZAR = 100;
+export const SHIPPING_FLAT_ZAR = 120;
