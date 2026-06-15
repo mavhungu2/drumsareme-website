@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Loader2, MapPin, Truck, X } from "lucide-react";
 import { AdminApiError, markOrderPaid } from "@/lib/admin/api-client";
+import type { MarkPaidResponse } from "@/lib/admin/analytics-types";
 import {
   COLLECTION_ADDRESS,
   MANUAL_PAYMENT_METHOD_LABEL,
@@ -22,7 +23,12 @@ interface MarkPaidDialogProps {
   orderId: string;
   open: boolean;
   onClose: () => void;
-  onMarked: () => void;
+  onMarked: (response: MarkPaidResponse) => void;
+  /**
+   * Service ("none") invoices have no fulfilment — the dialog then only asks
+   * for payment method and records fulfilment "none" with no delivery fee.
+   */
+  isService?: boolean;
 }
 
 const PAYMENTS: ManualPaymentMethod[] = ["cash", "card", "eft"];
@@ -35,6 +41,7 @@ export default function MarkPaidDialog({
   open,
   onClose,
   onMarked,
+  isService = false,
 }: MarkPaidDialogProps) {
   const titleId = useId();
   const paymentId = useId();
@@ -61,21 +68,27 @@ export default function MarkPaidDialog({
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (submitting) return;
+      const effectiveFulfilment = isService ? "none" : fulfilment;
       const fee =
-        fulfilment === "collection" ? 0 : Number.parseFloat(deliveryFee);
-      if (fulfilment === "delivery" && (!Number.isFinite(fee) || fee < 0)) {
+        effectiveFulfilment === "delivery"
+          ? Number.parseFloat(deliveryFee)
+          : 0;
+      if (
+        effectiveFulfilment === "delivery" &&
+        (!Number.isFinite(fee) || fee < 0)
+      ) {
         setError("Delivery fee must be a non-negative number.");
         return;
       }
       setSubmitting(true);
       setError(null);
       try {
-        await markOrderPaid(orderId, {
+        const response = await markOrderPaid(orderId, {
           manualPaymentMethod: paymentMethod,
-          fulfilment,
-          deliveryFee: fulfilment === "delivery" ? fee : 0,
+          fulfilment: effectiveFulfilment,
+          deliveryFee: effectiveFulfilment === "delivery" ? fee : 0,
         });
-        onMarked();
+        onMarked(response);
         onClose();
       } catch (err) {
         const message =
@@ -92,6 +105,7 @@ export default function MarkPaidDialog({
     [
       deliveryFee,
       fulfilment,
+      isService,
       onClose,
       onMarked,
       orderId,
@@ -148,7 +162,14 @@ export default function MarkPaidDialog({
           </select>
         </label>
 
-        <fieldset className="space-y-2" disabled={submitting}>
+        {isService ? (
+          <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+            Service invoice — no fulfilment or delivery fee. Marking paid will
+            move it straight to paid; complete it once the service is done.
+          </p>
+        ) : (
+          <>
+            <fieldset className="space-y-2" disabled={submitting}>
           <legend className="text-xs font-medium text-muted">
             Fulfilment <span className="text-red-700">*</span>
           </legend>
@@ -220,6 +241,8 @@ export default function MarkPaidDialog({
               className={FIELD_CLASS}
             />
           </label>
+        )}
+          </>
         )}
 
         {error ? (

@@ -188,13 +188,15 @@ export default function Invoice({ order }: InvoiceProps) {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {order.items.map((item, index) => (
-              <tr key={`${item.productId}-${index}`}>
+              <tr key={`${item.productId ?? "service"}-${index}`}>
                 <td className="py-3">
                   <p className="font-medium">
                     {item.name}{" "}
-                    <span className="text-xs text-gray-500 font-mono font-normal">
-                      · {item.productId}
-                    </span>
+                    {item.productId ? (
+                      <span className="text-xs text-gray-500 font-mono font-normal">
+                        · {item.productId}
+                      </span>
+                    ) : null}
                   </p>
                 </td>
                 <td className="py-3 text-right tabular-nums">{item.qty}</td>
@@ -225,18 +227,20 @@ export default function Invoice({ order }: InvoiceProps) {
               </span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-gray-600">
-              {order.fulfilment === "collection"
-                ? "Collection"
-                : order.fulfilment === "delivery"
-                  ? "Delivery"
-                  : "Shipping"}
-            </span>
-            <span className="tabular-nums">
-              {order.shipping > 0 ? formatZar(order.shipping) : "Free"}
-            </span>
-          </div>
+          {order.fulfilment !== "none" && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">
+                {order.fulfilment === "collection"
+                  ? "Collection"
+                  : order.fulfilment === "delivery"
+                    ? "Delivery"
+                    : "Shipping"}
+              </span>
+              <span className="tabular-nums">
+                {order.shipping > 0 ? formatZar(order.shipping) : "Free"}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between border-t border-gray-300 pt-2 mt-2 text-base font-bold">
             <span>
               {cancelled

@@ -379,8 +379,10 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
     for (const item of order.items) {
       const yStart = rowY;
       // Combine name + productId on one line so the row divider doesn't
-      // visually cross through the SKU label.
-      const labelText = `${item.name}  ·  ${item.productId}`;
+      // visually cross through the SKU label. Service lines have no SKU.
+      const labelText = item.productId
+        ? `${item.name}  ·  ${item.productId}`
+        : item.name;
       doc
         .font("Helvetica-Bold")
         .fontSize(10)
@@ -435,22 +437,25 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
         align: "right",
       });
     }
-    tY = doc.y + 4;
-    const shippingLabel =
-      order.fulfilment === "collection"
-        ? "Collection"
-        : order.fulfilment === "delivery"
-          ? "Delivery"
-          : "Shipping";
-    doc.fillColor("#6b7280").text(shippingLabel, totalsLabelX, tY);
-    doc
-      .fillColor("#0a0a0a")
-      .text(
-        order.shipping > 0 ? formatZAR(order.shipping) : "Free",
-        totalsValueX,
-        tY,
-        { width: totalsValueWidth, align: "right" },
-      );
+    // Service ("none") invoices have no shipping line at all.
+    if (order.fulfilment !== "none") {
+      tY = doc.y + 4;
+      const shippingLabel =
+        order.fulfilment === "collection"
+          ? "Collection"
+          : order.fulfilment === "delivery"
+            ? "Delivery"
+            : "Shipping";
+      doc.fillColor("#6b7280").text(shippingLabel, totalsLabelX, tY);
+      doc
+        .fillColor("#0a0a0a")
+        .text(
+          order.shipping > 0 ? formatZAR(order.shipping) : "Free",
+          totalsValueX,
+          tY,
+          { width: totalsValueWidth, align: "right" },
+        );
+    }
     tY = doc.y + 6;
     doc
       .moveTo(totalsLabelX, tY)

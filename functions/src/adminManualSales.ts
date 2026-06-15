@@ -26,10 +26,9 @@ const MAX_NAME_LEN = 120;
 const MAX_PHONE_LEN = 30;
 const MAX_NOTES_LEN = 500;
 
-interface ManualSaleItemInput {
-  productId: string;
-  qty: number;
-}
+type ManualSaleItemInput =
+  | { kind: "product"; productId: string; qty: number }
+  | { kind: "service"; description: string; qty: number; unitPrice: number };
 
 interface ManualSaleInput {
   customer: {
@@ -49,6 +48,9 @@ interface ManualSaleInput {
   notes?: string;
   promoCode?: string;
 }
+
+const MAX_SERVICE_DESC_LEN = 200;
+const MAX_SERVICE_UNIT_PRICE = 1_000_000;
 
 const MAX_ADDRESS_LEN = 200;
 
@@ -120,10 +122,14 @@ function validate(
 
   let fulfilment: Fulfilment = "delivery";
   if (rawFulfilment !== undefined) {
-    if (rawFulfilment !== "delivery" && rawFulfilment !== "collection") {
+    if (
+      rawFulfilment !== "delivery" &&
+      rawFulfilment !== "collection" &&
+      rawFulfilment !== "none"
+    ) {
       return {
         ok: false,
-        error: "fulfilment must be 'delivery' or 'collection'",
+        error: "fulfilment must be 'delivery', 'collection' or 'none'",
       };
     }
     fulfilment = rawFulfilment;
@@ -140,10 +146,12 @@ function validate(
     }
     deliveryFeeClean = Math.round(deliveryFee * 100) / 100;
   }
-  if (fulfilment === "collection" && deliveryFeeClean > 0) {
+  // Only delivery orders carry a shipping fee. Collection and service ("none")
+  // invoices are always free-shipping.
+  if (fulfilment !== "delivery" && deliveryFeeClean > 0) {
     return {
       ok: false,
-      error: "deliveryFee must be 0 for collection orders",
+      error: "deliveryFee must be 0 for collection and service orders",
     };
   }
 
@@ -198,19 +206,62 @@ function validate(
       return { ok: false, error: "Invalid item" };
     }
     const it = raw as Record<string, unknown>;
-    if (typeof it.productId !== "string" || it.productId.trim().length === 0) {
-      return { ok: false, error: "item.productId required" };
-    }
-    if (
-      typeof it.qty !== "number" ||
-      !Number.isFinite(it.qty) ||
-      !Number.isInteger(it.qty) ||
-      it.qty <= 0 ||
-      it.qty > 1000
-    ) {
+
+    const qtyValid =
+      typeof it.qty === "number" &&
+      Number.isFinite(it.qty) &&
+      Number.isInteger(it.qty) &&
+      it.qty > 0 &&
+      it.qty <= 1000;
+    if (!qtyValid) {
       return { ok: false, error: "item.qty must be a positive integer ≤ 1000" };
     }
-    cleanItems.push({ productId: it.productId.trim(), qty: it.qty });
+    const qty = it.qty as number;
+
+    // A line is a catalog product when it carries a productId; otherwise it's
+    // an ad-hoc service line (description + unitPrice, no inventory).
+    const hasProductId =
+      typeof it.productId === "string" && it.productId.trim().length > 0;
+    if (hasProductId) {
+      cleanItems.push({
+        kind: "product",
+        productId: (it.productId as string).trim(),
+        qty,
+      });
+      continue;
+    }
+
+    // Service line.
+    if (
+      typeof it.description !== "string" ||
+      it.description.trim().length === 0
+    ) {
+      return {
+        ok: false,
+        error: "item must have a productId or a service description",
+      };
+    }
+    const description = it.description.trim();
+    if (description.length > MAX_SERVICE_DESC_LEN) {
+      return { ok: false, error: "item.description too long" };
+    }
+    if (
+      typeof it.unitPrice !== "number" ||
+      !Number.isFinite(it.unitPrice) ||
+      it.unitPrice < 0 ||
+      it.unitPrice > MAX_SERVICE_UNIT_PRICE
+    ) {
+      return {
+        ok: false,
+        error: "service item.unitPrice must be a non-negative number",
+      };
+    }
+    cleanItems.push({
+      kind: "service",
+      description,
+      qty,
+      unitPrice: Math.round(it.unitPrice * 100) / 100,
+    });
   }
 
   let notesClean: string | undefined;
@@ -264,6 +315,17 @@ async function createManualSale(
   const orderItems: OrderItem[] = [];
   let subtotal = 0;
   for (const it of input.items) {
+    if (it.kind === "service") {
+      const lineTotal = Math.round(it.unitPrice * it.qty * 100) / 100;
+      orderItems.push({
+        name: it.description,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        lineTotal,
+      });
+      subtotal += lineTotal;
+      continue;
+    }
     const product = await getServerProduct(it.productId);
     if (!product) {
       res.status(400).json({ error: `Unknown product ${it.productId}` });
@@ -280,16 +342,21 @@ async function createManualSale(
     subtotal += lineTotal;
   }
 
-  // Reject up front if any tracked SKU has insufficient stock. Untracked
+  // Reject up front if any tracked SKU has insufficient stock. Service lines
+  // (no productId) carry no inventory and are skipped entirely. Untracked
   // SKUs (no inventory doc) pass through. The Mark as Paid transaction
   // re-checks atomically — this is just an early sanity gate so the admin
   // doesn't create a pending sale for a stick we can't fulfil.
-  const inventoryRefs = orderItems.map((item) => ({
-    productId: item.productId,
-    qty: item.qty,
-    name: item.name,
-    ref: db.collection("inventory").doc(item.productId),
-  }));
+  const inventoryRefs = orderItems
+    .filter((item): item is OrderItem & { productId: string } =>
+      Boolean(item.productId),
+    )
+    .map((item) => ({
+      productId: item.productId,
+      qty: item.qty,
+      name: item.name,
+      ref: db.collection("inventory").doc(item.productId),
+    }));
   const inventorySnaps = await Promise.all(
     inventoryRefs.map(({ ref }) => ref.get()),
   );

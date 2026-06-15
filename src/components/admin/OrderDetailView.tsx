@@ -74,13 +74,18 @@ export default function OrderDetailView({
   onAddNote,
   mutating = false,
 }: OrderDetailViewProps) {
+  const isService = order.fulfilment === "none";
   const canMarkPaid =
     Boolean(onMarkPaid) &&
     order.status === "pending" &&
     order.source === "manual";
-  const canMarkShipped = Boolean(onMarkShipped) && order.status === "paid";
+  // Service invoices have no shipped / ready-to-collect step.
+  const canMarkShipped =
+    Boolean(onMarkShipped) && order.status === "paid" && !isService;
   const canMarkCompleted =
-    Boolean(onMarkCompleted) && order.status === "shipped";
+    Boolean(onMarkCompleted) &&
+    (order.status === "shipped" ||
+      (order.status === "paid" && isService));
   const canCancel =
     Boolean(onCancel) &&
     order.status !== "cancelled" &&
@@ -109,6 +114,8 @@ export default function OrderDetailView({
       <Truck size={14} className="text-foreground" aria-hidden />
       Delivery
     </span>
+  ) : isService ? (
+    <span className="text-foreground">Service / no shipping</span>
   ) : (
     <span className="text-muted">Not set yet — choose at Mark as Paid</span>
   );
@@ -144,6 +151,14 @@ export default function OrderDetailView({
       value: order.customer.notes || "—",
     },
   ];
+
+  // Collector details captured at the ready-to-collect step (optional).
+  if (isCollection && order.collection) {
+    const c = order.collection;
+    const who = [c.collectorName, c.collectorContact].filter(Boolean).join(" · ");
+    if (who) customerRows.push({ label: "Collected by", value: who });
+    if (c.note) customerRows.push({ label: "Collection note", value: c.note });
+  }
 
   const paymentRows: DetailRow[] = [
     {
@@ -298,8 +313,8 @@ export default function OrderDetailView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {order.items.map((item) => (
-                <tr key={`${item.productId}-${item.name}`}>
+              {order.items.map((item, index) => (
+                <tr key={`${item.productId ?? "service"}-${index}`}>
                   <td className="py-3 pr-3 text-foreground">{item.name}</td>
                   <td className="py-3 text-right tabular-nums">{item.qty}</td>
                   <td className="py-3 text-right tabular-nums text-muted">
@@ -331,14 +346,16 @@ export default function OrderDetailView({
                   </td>
                 </tr>
               )}
-              <tr>
-                <td colSpan={3} className="py-2 text-right text-muted">
-                  Shipping
-                </td>
-                <td className="py-2 text-right tabular-nums">
-                  {formatZar(order.shipping)}
-                </td>
-              </tr>
+              {!isService && (
+                <tr>
+                  <td colSpan={3} className="py-2 text-right text-muted">
+                    {isCollection ? "Collection" : "Shipping"}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">
+                    {order.shipping > 0 ? formatZar(order.shipping) : "Free"}
+                  </td>
+                </tr>
+              )}
               <tr className="border-t border-border">
                 <td colSpan={3} className="py-3 text-right font-semibold">
                   Total

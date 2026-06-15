@@ -67,10 +67,9 @@ export interface AnalyticsQuery {
   to?: string;
 }
 
-export type ManualSaleItemInput = {
-  productId: string;
-  qty: number;
-};
+export type ManualSaleItemInput =
+  | { productId: string; qty: number }
+  | { description: string; qty: number; unitPrice: number };
 
 export interface ManualSaleInput {
   customer: {
@@ -85,9 +84,10 @@ export interface ManualSaleInput {
     postalCode?: string;
   };
   items: ManualSaleItemInput[];
-  fulfilment: "delivery" | "collection";
+  fulfilment: "delivery" | "collection" | "none";
   deliveryFee: number;
   notes?: string;
+  promoCode?: string;
 }
 
 export interface ManualSaleResponse {
@@ -96,12 +96,12 @@ export interface ManualSaleResponse {
   subtotal: number;
   total: number;
   shipping: number;
-  fulfilment: "delivery" | "collection";
+  fulfilment: "delivery" | "collection" | "none";
 }
 
 export interface MarkPaidInput {
   manualPaymentMethod: "cash" | "card" | "eft";
-  fulfilment: "delivery" | "collection";
+  fulfilment: "delivery" | "collection" | "none";
   deliveryFee?: number;
 }
 
@@ -109,6 +109,6 @@ export interface MarkPaidResponse {
   ok: true;
   status: "paid";
   manualPaymentMethod: "cash" | "card" | "eft";
-  fulfilment: "delivery" | "collection";
+  fulfilment: "delivery" | "collection" | "none";
   shipping: number;
 }

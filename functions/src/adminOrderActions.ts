@@ -10,6 +10,8 @@ import {
   type InventoryItem,
   type ManualPaymentMethod,
   type Order,
+  type OrderCollection,
+  type OrderItem,
   type OrderNote,
   type OrderTracking,
 } from "./lib/firestore";
@@ -155,6 +157,38 @@ function validateTrackingInput(
   return { ok: true, tracking };
 }
 
+const MAX_COLLECTION_FIELD_LEN = 200;
+
+function validateCollectionReadyInput(
+  body: Record<string, unknown>,
+):
+  | { ok: true; collection: OrderCollection }
+  | { ok: false; error: string } {
+  const { collectorName, collectorContact, note, ...extra } = body;
+  if (Object.keys(extra).length > 0) {
+    return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+  const collection: OrderCollection = {};
+  const optionalFields: Array<[string, unknown, keyof OrderCollection]> = [
+    ["collectorName", collectorName, "collectorName"],
+    ["collectorContact", collectorContact, "collectorContact"],
+    ["note", note, "note"],
+  ];
+  for (const [label, value, key] of optionalFields) {
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "string") {
+      return { ok: false, error: `${label} must be a string` };
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0) continue;
+    if (trimmed.length > MAX_COLLECTION_FIELD_LEN) {
+      return { ok: false, error: `${label} too long` };
+    }
+    collection[key] = trimmed;
+  }
+  return { ok: true, collection };
+}
+
 function validateNoteInput(
   body: Record<string, unknown>,
 ): { ok: true; body: string } | { ok: false; error: string } {
@@ -225,13 +259,6 @@ const adminMarkShipped: Handler = async ({ req, res, uid, orderId }) => {
     return;
   }
 
-  const validated = validateTrackingInput(parsed.body);
-  if (!validated.ok) {
-    res.status(400).json({ error: validated.error });
-    return;
-  }
-  const { tracking } = validated;
-
   const orderRef = db.collection("orders").doc(orderId);
   const snap = await orderRef.get();
   if (!snap.exists) {
@@ -239,6 +266,16 @@ const adminMarkShipped: Handler = async ({ req, res, uid, orderId }) => {
     return;
   }
   const order = snap.data() as Order;
+  const isCollection = order.fulfilment === "collection";
+
+  // Service ("none") invoices have no shipping / ready-to-collect step — the
+  // UI hides the button, but guard the endpoint against direct calls.
+  if (order.fulfilment === "none") {
+    res
+      .status(409)
+      .json({ error: "Service invoices have no shipping step" });
+    return;
+  }
 
   if (order.status === "shipped") {
     logger.info("adminOrderActions idempotent mark-shipped", {
@@ -251,16 +288,67 @@ const adminMarkShipped: Handler = async ({ req, res, uid, orderId }) => {
       tracking: order.tracking
         ? (serializeTimestamps(order.tracking) as Record<string, unknown>)
         : null,
+      collection: order.collection ?? null,
     });
     return;
   }
 
   if (order.status !== "paid") {
     res.status(409).json({
-      error: `Cannot mark ${order.status} order as shipped`,
+      error: `Cannot mark ${order.status} order as ${
+        isCollection ? "ready to collect" : "shipped"
+      }`,
     });
     return;
   }
+
+  // Collection orders capture OPTIONAL collector details (no courier tracking).
+  // Delivery orders require carrier + tracking number.
+  if (isCollection) {
+    const validated = validateCollectionReadyInput(parsed.body);
+    if (!validated.ok) {
+      res.status(400).json({ error: validated.error });
+      return;
+    }
+    const { collection } = validated;
+    const hasCollection = Object.keys(collection).length > 0;
+
+    await orderRef.update({
+      status: "shipped",
+      shippedAt: FieldValue.serverTimestamp(),
+      ...(hasCollection ? { collection } : {}),
+    });
+
+    const readyOrder: Order = {
+      ...order,
+      status: "shipped",
+      ...(hasCollection ? { collection } : {}),
+    };
+    try {
+      await sendShippingConfirmation(RESEND_API_KEY.value(), readyOrder);
+    } catch (err) {
+      logger.error("Ready-to-collect email send failed", {
+        uid,
+        orderId,
+        err: String(err),
+      });
+    }
+
+    logger.info("adminOrderActions", {
+      uid,
+      action: "mark-ready-to-collect",
+      orderId,
+    });
+    res.status(200).json({ ok: true, collection });
+    return;
+  }
+
+  const validated = validateTrackingInput(parsed.body);
+  if (!validated.ok) {
+    res.status(400).json({ error: validated.error });
+    return;
+  }
+  const { tracking } = validated;
 
   await orderRef.update({
     status: "shipped",
@@ -384,10 +472,14 @@ const adminCancelOrder: Handler = async ({ req, res, uid, orderId }) => {
     const shouldCredit = current.inventoryApplied === true;
 
     if (shouldCredit) {
-      const inventoryRefs = (current.items ?? []).map((item) => ({
-        ref: db.collection("inventory").doc(item.productId),
-        qty: item.qty,
-      }));
+      const inventoryRefs = (current.items ?? [])
+        .filter((item): item is OrderItem & { productId: string } =>
+          Boolean(item.productId),
+        )
+        .map((item) => ({
+          ref: db.collection("inventory").doc(item.productId),
+          qty: item.qty,
+        }));
       const inventorySnaps = await Promise.all(
         inventoryRefs.map(({ ref }) => tx.get(ref)),
       );
@@ -456,8 +548,15 @@ function validateMarkPaidInput(
       error: `manualPaymentMethod must be one of ${VALID_PAYMENT_METHODS.join(", ")}`,
     };
   }
-  if (fulfilment !== "delivery" && fulfilment !== "collection") {
-    return { ok: false, error: "fulfilment must be 'delivery' or 'collection'" };
+  if (
+    fulfilment !== "delivery" &&
+    fulfilment !== "collection" &&
+    fulfilment !== "none"
+  ) {
+    return {
+      ok: false,
+      error: "fulfilment must be 'delivery', 'collection' or 'none'",
+    };
   }
   let fee = 0;
   if (deliveryFee !== undefined) {
@@ -470,10 +569,10 @@ function validateMarkPaidInput(
     }
     fee = Math.round(deliveryFee * 100) / 100;
   }
-  if (fulfilment === "collection" && fee > 0) {
+  if (fulfilment !== "delivery" && fee > 0) {
     return {
       ok: false,
-      error: "deliveryFee must be 0 for collection orders",
+      error: "deliveryFee must be 0 for collection and service orders",
     };
   }
   return {
@@ -505,7 +604,7 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
     | { kind: "not-found" }
     | { kind: "bad-status"; status: Order["status"] }
     | { kind: "bad-source"; source: string | undefined }
-    | { kind: "ok" };
+    | { kind: "ok"; transitioned: boolean };
 
   try {
     const result = await db.runTransaction<TxResult>(async (tx) => {
@@ -513,8 +612,10 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
       if (!snap.exists) return { kind: "not-found" };
       const order = snap.data() as Order;
       if (order.status === "paid" || order.inventoryApplied === true) {
-        // Idempotent: already marked paid by a concurrent click.
-        return { kind: "ok" };
+        // Idempotent: already marked paid by a concurrent click. No transition
+        // happened here, so the caller must NOT re-send the ready-to-collect
+        // email.
+        return { kind: "ok", transitioned: false };
       }
       if (order.status !== "pending") {
         return { kind: "bad-status", status: order.status };
@@ -523,11 +624,17 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
         return { kind: "bad-source", source: order.source };
       }
 
-      const inventoryRefs = (order.items ?? []).map((item) => ({
-        ref: db.collection("inventory").doc(item.productId),
-        qty: item.qty,
-        name: item.name,
-      }));
+      // Service lines (no productId) carry no stock — only product lines hit
+      // inventory.
+      const inventoryRefs = (order.items ?? [])
+        .filter((item): item is OrderItem & { productId: string } =>
+          Boolean(item.productId),
+        )
+        .map((item) => ({
+          ref: db.collection("inventory").doc(item.productId),
+          qty: item.qty,
+          name: item.name,
+        }));
       const inventorySnaps = await Promise.all(
         inventoryRefs.map(({ ref }) => tx.get(ref)),
       );
@@ -605,7 +712,7 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
         });
       }
 
-      return { kind: "ok" };
+      return { kind: "ok", transitioned: true };
     });
 
     if (result.kind === "not-found") {
@@ -636,10 +743,12 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
 
     // Collection orders auto-advance to "shipped" (= ready to collect) at
     // mark-paid time. Fire the ready-to-collect email so the customer knows
-    // their order is waiting at Spring Glade.
+    // their order is waiting at Spring Glade. Only on a real transition —
+    // a concurrent double-click hits the idempotent branch and must not
+    // re-email.
     const finalStatus =
       input.fulfilment === "collection" ? "shipped" : "paid";
-    if (input.fulfilment === "collection") {
+    if (input.fulfilment === "collection" && result.transitioned) {
       try {
         const fresh = await orderRef.get();
         if (fresh.exists && fresh.data()?.customer?.email) {
@@ -699,9 +808,17 @@ const adminMarkCompleted: Handler = async ({ res, uid, orderId }) => {
     });
     return;
   }
-  if (order.status !== "shipped") {
+  // Service ("none") invoices have no shipped step — they complete straight
+  // from paid. Everything else must be shipped first.
+  const completable =
+    order.status === "shipped" ||
+    (order.status === "paid" && order.fulfilment === "none");
+  if (!completable) {
     res.status(409).json({
-      error: `Cannot mark ${order.status} order as completed — must be shipped first`,
+      error:
+        order.fulfilment === "none"
+          ? `Cannot mark ${order.status} order as completed — must be paid first`
+          : `Cannot mark ${order.status} order as completed — must be shipped first`,
     });
     return;
   }

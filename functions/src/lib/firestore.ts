@@ -7,7 +7,12 @@ export const db = getFirestore();
 export { FieldValue, Timestamp };
 
 export interface OrderItem {
-  productId: string;
+  /**
+   * Catalog SKU. Present for products (inventory-tracked); ABSENT for ad-hoc
+   * service line items (e.g. a drumming gig or singing performance) added on a
+   * manual invoice. Inventory logic must skip items without a productId.
+   */
+  productId?: string;
   name: string;
   qty: number;
   unitPrice: number;
@@ -39,9 +44,26 @@ export interface OrderTracking {
   url?: string;
 }
 
+/**
+ * Optional details captured when a self-collection order is marked ready to
+ * collect. All fields optional — the customer usually collects in person, but
+ * they may send a courier / third party, in which case the admin records who.
+ */
+export interface OrderCollection {
+  collectorName?: string;
+  collectorContact?: string;
+  note?: string;
+}
+
 export type OrderSource = "yoco" | "manual";
 export type ManualPaymentMethod = "cash" | "card" | "eft";
-export type Fulfilment = "delivery" | "collection";
+/**
+ * "none" = a service/no-shipping invoice (e.g. a performance booking). Such
+ * orders have no delivery fee, no shipping line, and skip the shipped /
+ * ready-to-collect step — they go straight paid → completed. The storefront
+ * only ever uses "delivery" | "collection"; "none" is manual-invoice only.
+ */
+export type Fulfilment = "delivery" | "collection" | "none";
 
 /**
  * Shared collection address. The retailer offers customer self-collection from
@@ -100,6 +122,7 @@ export interface Order {
   cancelledAt?: FirebaseFirestore.Timestamp;
   receiptResendAt?: FirebaseFirestore.Timestamp;
   tracking?: OrderTracking;
+  collection?: OrderCollection;
   notes?: OrderNote[];
 }
 

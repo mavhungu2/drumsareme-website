@@ -93,11 +93,13 @@ export const yocoWebhook = onRequest(
         if (current.status === "paid" || current.inventoryApplied === true) {
           return;
         }
-        const inventoryRefs = (current.items ?? []).map((item) => ({
-          ref: db.collection("inventory").doc(item.productId),
-          qty: item.qty,
-          name: item.name,
-        }));
+        const inventoryRefs = (current.items ?? [])
+          .filter((item) => Boolean(item.productId))
+          .map((item) => ({
+            ref: db.collection("inventory").doc(item.productId as string),
+            qty: item.qty,
+            name: item.name,
+          }));
         const inventorySnaps = await Promise.all(
           inventoryRefs.map(({ ref }) => tx.get(ref)),
         );

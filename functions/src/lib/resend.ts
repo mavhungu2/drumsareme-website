@@ -57,6 +57,8 @@ function emailContainer(innerHtml: string): string {
 }
 
 function fulfilmentBlockHtml(order: Order): string {
+  // Service invoices have no delivery/collection block.
+  if (order.fulfilment === "none") return "";
   if (order.fulfilment === "collection") {
     const a = COLLECTION_ADDRESS;
     return `
@@ -71,12 +73,16 @@ function fulfilmentBlockHtml(order: Order): string {
 }
 
 function orderBodyHtml(order: Order, intro: string): string {
-  const shippingLabel = order.fulfilment === "collection" ? "Collection" : "Shipping";
   const discount = order.discount ?? 0;
   const discountRow =
     discount > 0
       ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
       : "";
+  // Service ("none") invoices have no shipping concept — omit the row entirely.
+  const shippingRow =
+    order.fulfilment === "none"
+      ? ""
+      : `<tr><td style="padding:6px 0">${order.fulfilment === "collection" ? "Collection" : "Shipping"}</td><td style="padding:6px 0;text-align:right">${order.fulfilment === "collection" ? "Free" : formatZAR(order.shipping)}</td></tr>`;
   return emailContainer(`
     <h2 style="margin:0 0 8px">${intro}</h2>
     <p style="color:#6b7280;margin:0 0 24px">Order <strong>${order.ref}</strong></p>
@@ -84,7 +90,7 @@ function orderBodyHtml(order: Order, intro: string): string {
       ${itemsHtml(order)}
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
       ${discountRow}
-      <tr><td style="padding:6px 0">${shippingLabel}</td><td style="padding:6px 0;text-align:right">${order.fulfilment === "collection" ? "Free" : formatZAR(order.shipping)}</td></tr>
+      ${shippingRow}
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
     </table>
     ${fulfilmentBlockHtml(order)}
@@ -98,10 +104,12 @@ function invoiceBodyHtml(order: Order): string {
     discount > 0
       ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
       : "";
+  // Match the attached PDF + admin surfaces: omit only for service ("none")
+  // invoices; collection/free-delivery still show the row labelled "Free".
   const shippingRow =
-    order.shipping > 0
-      ? `<tr><td style="padding:6px 0">${order.fulfilment === "collection" ? "Collection" : "Shipping"}</td><td style="padding:6px 0;text-align:right">${formatZAR(order.shipping)}</td></tr>`
-      : "";
+    order.fulfilment === "none"
+      ? ""
+      : `<tr><td style="padding:6px 0">${order.fulfilment === "collection" ? "Collection" : "Shipping"}</td><td style="padding:6px 0;text-align:right">${order.shipping > 0 ? formatZAR(order.shipping) : "Free"}</td></tr>`;
   return emailContainer(`
     <h2 style="margin:0 0 8px">Here's your invoice</h2>
     <p style="color:#6b7280;margin:0 0 16px">Order <strong>${order.ref}</strong></p>
@@ -209,6 +217,10 @@ export async function sendShippingConfirmation(
 }
 
 function cancellationBodyHtml(order: Order, reason: string): string {
+  const shippingRow =
+    order.fulfilment === "none"
+      ? ""
+      : `<tr><td style="padding:6px 0">${order.fulfilment === "collection" ? "Collection" : "Shipping"}</td><td style="padding:6px 0;text-align:right">${order.fulfilment === "collection" ? "Free" : formatZAR(order.shipping)}</td></tr>`;
   return emailContainer(`
     <h2 style="margin:0 0 8px">Your order has been cancelled</h2>
     <p style="color:#6b7280;margin:0 0 16px">Order <strong>${order.ref}</strong></p>
@@ -219,7 +231,12 @@ function cancellationBodyHtml(order: Order, reason: string): string {
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       ${itemsHtml(order)}
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
-      <tr><td style="padding:6px 0">Shipping</td><td style="padding:6px 0;text-align:right">${formatZAR(order.shipping)}</td></tr>
+      ${
+        (order.discount ?? 0) > 0
+          ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(order.discount ?? 0)}</td></tr>`
+          : ""
+      }
+      ${shippingRow}
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:600">Total</td><td style="padding:8px 0;text-align:right;border-top:1px solid #e5e7eb;font-weight:600">${formatZAR(order.total)}</td></tr>
     </table>
     <p style="margin:24px 0 0;font-size:13px;color:#6b7280">If you have any questions, reply to this email and we'll be happy to help.</p>

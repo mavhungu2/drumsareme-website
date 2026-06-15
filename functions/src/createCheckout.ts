@@ -140,17 +140,24 @@ export const createCheckout = onRequest(
       });
       subtotal += lineTotal;
     }
+    // Normalize after float accumulation so cents are exact downstream.
+    subtotal = Math.round(subtotal * 100) / 100;
 
     // Prevent overselling: reject if any item exceeds current stock. Inventory
     // is decremented at payment time, but this is the earliest point we can
     // refuse — saves the customer a trip through Yoco for a stick we can't
     // ship. There's still a tiny race window between this read and the
     // webhook decrement; the webhook itself is the authoritative gate.
-    const inventoryRefs = items.map((item) => ({
-      productId: item.productId,
-      qty: item.qty,
-      ref: db.collection("inventory").doc(item.productId),
-    }));
+    // Every storefront line is a catalog product, so productId is always set
+    // here (service lines only exist on admin manual invoices).
+    const inventoryRefs = items.map((item) => {
+      const productId = item.productId as string;
+      return {
+        productId,
+        qty: item.qty,
+        ref: db.collection("inventory").doc(productId),
+      };
+    });
     const inventorySnaps = await Promise.all(
       inventoryRefs.map(({ ref }) => ref.get()),
     );
@@ -194,7 +201,8 @@ export const createCheckout = onRequest(
       promoCode = promoResult.code;
     }
 
-    const total = Math.max(0, subtotal - discount) + shipping;
+    const total =
+      Math.round((Math.max(0, subtotal - discount) + shipping) * 100) / 100;
 
     const ref = await generateOrderRef();
     const orderDoc = db.collection("orders").doc();
@@ -217,7 +225,8 @@ export const createCheckout = onRequest(
     const siteUrl = SITE_URL.value();
     try {
       const checkout = await createYocoCheckout(YOCO_SECRET_KEY.value(), {
-        amount: total * 100,
+        // Yoco requires integer cents — round to guard against float drift.
+        amount: Math.round(total * 100),
         currency: "ZAR",
         successUrl: `${siteUrl}/checkout/success/?orderId=${orderId}`,
         cancelUrl: `${siteUrl}/checkout/cancelled/`,

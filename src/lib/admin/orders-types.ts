@@ -15,7 +15,8 @@ export type OrderStatus =
 
 export type OrderSource = "yoco" | "manual";
 export type ManualPaymentMethod = "cash" | "card" | "eft";
-export type Fulfilment = "delivery" | "collection";
+/** "none" = service/no-shipping invoice (e.g. a performance booking). */
+export type Fulfilment = "delivery" | "collection" | "none";
 
 export const COLLECTION_ADDRESS = {
   name: "Spring Glade",
@@ -39,7 +40,8 @@ export const MANUAL_PAYMENT_METHOD_LABEL: Readonly<
 };
 
 export interface OrderItem {
-  productId: string;
+  /** Absent for ad-hoc service line items (gigs, performances). */
+  productId?: string;
   name: string;
   qty: number;
   unitPrice: number;
@@ -71,6 +73,12 @@ export interface OrderTracking {
   url?: string;
 }
 
+export interface OrderCollection {
+  collectorName?: string;
+  collectorContact?: string;
+  note?: string;
+}
+
 export interface Order {
   id: string;
   ref: string;
@@ -99,6 +107,7 @@ export interface Order {
   completedAt?: string;
   cancelledAt?: string;
   tracking?: OrderTracking;
+  collection?: OrderCollection;
   notes?: OrderNote[];
 }
 

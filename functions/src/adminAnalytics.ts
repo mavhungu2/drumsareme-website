@@ -179,6 +179,9 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
     grossRevenue += order.total ?? 0;
 
     for (const item of order.items ?? []) {
+      // Service lines (no productId) contribute to revenue via order.total but
+      // are not catalog units — keep them out of unitsSold / product perf.
+      if (!item.productId) continue;
       unitsSold += item.qty;
       const existing = productMap.get(item.productId) ?? {
         productId: item.productId,

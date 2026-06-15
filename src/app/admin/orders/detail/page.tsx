@@ -12,9 +12,11 @@ import {
   resendReceipt,
 } from "@/lib/admin/api-client";
 import type { Order } from "@/lib/admin/orders-types";
+import type { MarkPaidResponse } from "@/lib/admin/analytics-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import OrderDetailView from "@/components/admin/OrderDetailView";
 import MarkShippedDialog from "@/components/admin/MarkShippedDialog";
+import MarkReadyToCollectDialog from "@/components/admin/MarkReadyToCollectDialog";
 import MarkPaidDialog from "@/components/admin/MarkPaidDialog";
 import CancelOrderDialog from "@/components/admin/CancelOrderDialog";
 
@@ -151,19 +153,25 @@ function OrderDetailContent() {
     }
   }, [refetch]);
 
-  const handleMarkedPaid = useCallback(async () => {
-    setMutating(true);
-    setMutationBanner(null);
-    try {
-      await refetch();
-      setMutationBanner({
-        kind: "success",
-        message: "Order marked as paid. Stock decremented.",
-      });
-    } finally {
-      setMutating(false);
-    }
-  }, [refetch]);
+  const handleMarkedPaid = useCallback(
+    async (response: MarkPaidResponse) => {
+      setMutating(true);
+      setMutationBanner(null);
+      try {
+        await refetch();
+        const message =
+          response.fulfilment === "collection"
+            ? "Order marked as paid and ready to collect."
+            : response.fulfilment === "none"
+              ? "Service invoice marked as paid."
+              : "Order marked as paid. Stock decremented.";
+        setMutationBanner({ kind: "success", message });
+      } finally {
+        setMutating(false);
+      }
+    },
+    [refetch],
+  );
 
   const handleCancelled = useCallback(async () => {
     setMutating(true);
@@ -289,13 +297,23 @@ function OrderDetailContent() {
         open={paidDialogOpen}
         onClose={() => setPaidDialogOpen(false)}
         onMarked={handleMarkedPaid}
+        isService={order.fulfilment === "none"}
       />
-      <MarkShippedDialog
-        orderId={order.id}
-        open={shipDialogOpen}
-        onClose={() => setShipDialogOpen(false)}
-        onShipped={handleShipped}
-      />
+      {order.fulfilment === "collection" ? (
+        <MarkReadyToCollectDialog
+          orderId={order.id}
+          open={shipDialogOpen}
+          onClose={() => setShipDialogOpen(false)}
+          onReady={handleShipped}
+        />
+      ) : (
+        <MarkShippedDialog
+          orderId={order.id}
+          open={shipDialogOpen}
+          onClose={() => setShipDialogOpen(false)}
+          onShipped={handleShipped}
+        />
+      )}
       <CancelOrderDialog
         orderId={order.id}
         currentStatus={order.status}

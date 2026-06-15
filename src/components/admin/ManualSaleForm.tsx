@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   Loader2,
   MapPin,
+  Music,
+  Package,
   Plus,
   Trash2,
   Truck,
@@ -13,7 +15,11 @@ import {
   AdminApiError,
   createManualSale,
 } from "@/lib/admin/api-client";
-import type { ManualSaleResponse } from "@/lib/admin/analytics-types";
+import type {
+  ManualSaleInput,
+  ManualSaleItemInput,
+  ManualSaleResponse,
+} from "@/lib/admin/analytics-types";
 import {
   COLLECTION_ADDRESS,
   type Fulfilment,
@@ -25,20 +31,34 @@ import CustomerPicker, {
   type PickerCustomer,
 } from "./CustomerPicker";
 
-interface LineRow {
-  rowId: string;
-  productId: string;
-  qty: string;
-}
+type LineRow =
+  | { rowId: string; kind: "product"; productId: string; qty: string }
+  | {
+      rowId: string;
+      kind: "service";
+      description: string;
+      unitPrice: string;
+      qty: string;
+    };
 
 interface ManualSaleFormProps {
   onSubmitted: (response: ManualSaleResponse) => void;
 }
 
-function newRow(productId: string): LineRow {
+function randomRowId(): string {
+  return `row_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function newProductRow(productId: string): LineRow {
+  return { rowId: randomRowId(), kind: "product", productId, qty: "1" };
+}
+
+function newServiceRow(): LineRow {
   return {
-    rowId: `row_${Math.random().toString(36).slice(2, 10)}`,
-    productId,
+    rowId: randomRowId(),
+    kind: "service",
+    description: "",
+    unitPrice: "0",
     qty: "1",
   };
 }
@@ -64,7 +84,9 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const [province, setProvince] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [notes, setNotes] = useState("");
-  const [rows, setRows] = useState<LineRow[]>([newRow(defaultProductId)]);
+  const [rows, setRows] = useState<LineRow[]>([
+    newProductRow(defaultProductId),
+  ]);
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [deliveryFeeInput, setDeliveryFeeInput] = useState("0");
   const [submitting, setSubmitting] = useState(false);
@@ -74,40 +96,47 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   );
 
   const deliveryFee =
-    fulfilment === "collection"
-      ? 0
-      : Math.max(0, Number.parseFloat(deliveryFeeInput) || 0);
+    fulfilment === "delivery"
+      ? Math.max(0, Number.parseFloat(deliveryFeeInput) || 0)
+      : 0;
 
   const overlay = useLiveOverlay();
 
-  const handlePickCustomer = useCallback(
-    (customer: PickerCustomer | null) => {
-      setPickedCustomer(customer);
-      if (customer) {
-        setFirstName(customer.firstName);
-        setLastName(customer.lastName);
-        setPhone(customer.phone);
-        setEmail(customer.email);
+  const handlePickCustomer = useCallback((customer: PickerCustomer | null) => {
+    setPickedCustomer(customer);
+    if (customer) {
+      setFirstName(customer.firstName);
+      setLastName(customer.lastName);
+      setPhone(customer.phone);
+      setEmail(customer.email);
+    }
+  }, []);
+
+  const lineTotalFor = useCallback(
+    (row: LineRow): number => {
+      const qty = Number.parseInt(row.qty, 10);
+      if (!Number.isFinite(qty) || qty <= 0) return 0;
+      if (row.kind === "product") {
+        const product = products.find((p) => p.id === row.productId);
+        return product ? product.price * qty : 0;
       }
+      const price = Number.parseFloat(row.unitPrice);
+      return Number.isFinite(price) && price >= 0 ? price * qty : 0;
     },
-    [],
+    [products],
   );
 
-  const subtotal = useMemo(() => {
-    return rows.reduce((sum, row) => {
-      const product = products.find((p) => p.id === row.productId);
-      const qty = Number.parseInt(row.qty, 10);
-      if (!product || !Number.isFinite(qty) || qty <= 0) return sum;
-      return sum + product.price * qty;
-    }, 0);
-  }, [products, rows]);
+  const subtotal = useMemo(
+    () => rows.reduce((sum, row) => sum + lineTotalFor(row), 0),
+    [rows, lineTotalFor],
+  );
 
-  // Sum requested qty per productId so the same SKU appearing on multiple
-  // rows is checked against the combined total (matches what the server
-  // does when it walks orderItems).
+  // Sum requested qty per productId so the same SKU on multiple rows is
+  // checked against the combined total (matches what the server does).
   const requestedByProductId = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of rows) {
+      if (row.kind !== "product") continue;
       const qty = Number.parseInt(row.qty, 10);
       if (!Number.isFinite(qty) || qty <= 0) continue;
       map.set(row.productId, (map.get(row.productId) ?? 0) + qty);
@@ -141,14 +170,19 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
 
   const updateRow = (rowId: string, patch: Partial<LineRow>) => {
     setRows((prev) =>
-      prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)),
+      prev.map((row) =>
+        row.rowId === rowId ? ({ ...row, ...patch } as LineRow) : row,
+      ),
     );
   };
   const removeRow = (rowId: string) => {
     setRows((prev) => prev.filter((row) => row.rowId !== rowId));
   };
-  const addRow = () => {
-    setRows((prev) => [...prev, newRow(defaultProductId)]);
+  const addProductRow = () => {
+    setRows((prev) => [...prev, newProductRow(defaultProductId)]);
+  };
+  const addServiceRow = () => {
+    setRows((prev) => [...prev, newServiceRow()]);
   };
 
   const handleSubmit = useCallback(
@@ -162,17 +196,29 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       if (!ph) return setError("Phone number is required.");
       if (rows.length === 0) return setError("Add at least one item.");
 
-      const items: { productId: string; qty: number }[] = [];
+      const items: ManualSaleItemInput[] = [];
       for (const row of rows) {
-        const product = products.find((p) => p.id === row.productId);
-        if (!product) return setError("Pick a product for every line.");
         const qty = Number.parseInt(row.qty, 10);
         if (!Number.isInteger(qty) || qty <= 0) {
-          return setError(
-            `Quantity for ${product.name} must be a positive whole number.`,
-          );
+          return setError("Every line needs a positive whole-number quantity.");
         }
-        items.push({ productId: product.id, qty });
+        if (row.kind === "product") {
+          const product = products.find((p) => p.id === row.productId);
+          if (!product) return setError("Pick a product for every line.");
+          items.push({ productId: product.id, qty });
+        } else {
+          const description = row.description.trim();
+          if (!description) {
+            return setError("Give every custom line a description.");
+          }
+          const unitPrice = Number.parseFloat(row.unitPrice);
+          if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+            return setError(
+              `Price for "${description}" must be a non-negative number.`,
+            );
+          }
+          items.push({ description, qty, unitPrice });
+        }
       }
 
       if (stockIssues.length > 0) {
@@ -182,7 +228,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         );
       }
 
-      if (fulfilment === "delivery" && (!Number.isFinite(deliveryFee) || deliveryFee < 0)) {
+      if (
+        fulfilment === "delivery" &&
+        (!Number.isFinite(deliveryFee) || deliveryFee < 0)
+      ) {
         return setError("Delivery fee must be a non-negative number.");
       }
 
@@ -194,7 +243,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       setSubmitting(true);
       setError(null);
       try {
-        const response = await createManualSale({
+        const payload: ManualSaleInput = {
           customer: {
             firstName: fn,
             lastName: ln,
@@ -214,7 +263,8 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           fulfilment,
           deliveryFee,
           notes: notes.trim() || undefined,
-        });
+        };
+        const response = await createManualSale(payload);
         onSubmitted(response);
       } catch (err) {
         const message =
@@ -248,6 +298,32 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
     ],
   );
 
+  const fulfilmentOptions: Array<{
+    value: Fulfilment;
+    label: string;
+    hint: string;
+    icon: typeof Truck;
+  }> = [
+    {
+      value: "delivery",
+      label: "Delivery",
+      hint: "Ships to the customer’s address",
+      icon: Truck,
+    },
+    {
+      value: "collection",
+      label: "Self-collection",
+      hint: `${COLLECTION_ADDRESS.name}, ${COLLECTION_ADDRESS.line1}, ${COLLECTION_ADDRESS.city}`,
+      icon: MapPin,
+    },
+    {
+      value: "none",
+      label: "Service / no shipping",
+      hint: "For gigs & performances — no delivery",
+      icon: Music,
+    },
+  ];
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -262,10 +338,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Customer</h2>
-        <CustomerPicker
-          selected={pickedCustomer}
-          onPick={handlePickCustomer}
-        />
+        <CustomerPicker selected={pickedCustomer} onPick={handlePickCustomer} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label
             htmlFor={firstNameId}
@@ -335,25 +408,94 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       </section>
 
       <section className="space-y-3">
-        <header className="flex items-center justify-between">
+        <header className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-foreground">Items</h2>
-          <button
-            type="button"
-            onClick={addRow}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm hover:bg-surface transition-colors"
-          >
-            <Plus size={14} aria-hidden />
-            Add line
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={addProductRow}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm hover:bg-surface transition-colors"
+            >
+              <Package size={14} aria-hidden />
+              Add product
+            </button>
+            <button
+              type="button"
+              onClick={addServiceRow}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm hover:bg-surface transition-colors"
+            >
+              <Plus size={14} aria-hidden />
+              Add custom line
+            </button>
+          </div>
         </header>
         <div className="space-y-2">
           {rows.map((row) => {
+            if (row.kind === "service") {
+              return (
+                <div
+                  key={row.rowId}
+                  className="grid grid-cols-12 gap-2 items-end"
+                >
+                  <label className="col-span-12 sm:col-span-6 flex flex-col gap-1 text-xs font-medium text-muted">
+                    <span>Description (service / custom)</span>
+                    <input
+                      type="text"
+                      value={row.description}
+                      onChange={(e) =>
+                        updateRow(row.rowId, { description: e.target.value })
+                      }
+                      placeholder="e.g. Drumming performance — 2hr set"
+                      className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                  </label>
+                  <label className="col-span-3 sm:col-span-2 flex flex-col gap-1 text-xs font-medium text-muted">
+                    <span>Unit price</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={row.unitPrice}
+                      onChange={(e) =>
+                        updateRow(row.rowId, { unitPrice: e.target.value })
+                      }
+                      className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                  </label>
+                  <label className="col-span-3 sm:col-span-1 flex flex-col gap-1 text-xs font-medium text-muted">
+                    <span>Qty</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={row.qty}
+                      onChange={(e) =>
+                        updateRow(row.rowId, { qty: e.target.value })
+                      }
+                      className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    />
+                  </label>
+                  <div className="col-span-4 sm:col-span-2 flex flex-col gap-1 text-xs font-medium text-muted">
+                    <span>Line total</span>
+                    <p className="h-10 inline-flex items-center px-3 text-sm font-semibold tabular-nums">
+                      {formatZar(lineTotalFor(row))}
+                    </p>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1 flex items-center justify-end pb-1">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(row.rowId)}
+                      disabled={rows.length === 1}
+                      aria-label="Remove line"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                    >
+                      <Trash2 size={14} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
             const product = products.find((p) => p.id === row.productId);
-            const qty = Number.parseInt(row.qty, 10);
-            const lineTotal =
-              product && Number.isFinite(qty) && qty > 0
-                ? product.price * qty
-                : 0;
             const stockForProduct = overlay.get(row.productId)?.stock;
             const requestedForProduct =
               requestedByProductId.get(row.productId) ?? 0;
@@ -399,7 +541,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                 <div className="col-span-6 sm:col-span-3 flex flex-col gap-1 text-xs font-medium text-muted">
                   <span>Line total</span>
                   <p className="h-10 inline-flex items-center px-3 text-sm font-semibold tabular-nums">
-                    {formatZar(lineTotal)}
+                    {formatZar(lineTotalFor(row))}
                   </p>
                 </div>
                 <div className="col-span-2 sm:col-span-1 flex items-center justify-end pb-1">
@@ -413,6 +555,11 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                     <Trash2 size={14} aria-hidden />
                   </button>
                 </div>
+                {!product && (
+                  <p className="col-span-12 text-xs text-amber-700">
+                    Pick a product for this line.
+                  </p>
+                )}
                 {stockForProduct !== undefined && (
                   <p
                     className={`col-span-12 text-xs ${
@@ -423,9 +570,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
                           : "text-muted"
                     }`}
                   >
-                    {overSpec && (
-                      <AlertTriangle size={12} aria-hidden />
-                    )}
+                    {overSpec && <AlertTriangle size={12} aria-hidden />}
                     {overSpec
                       ? `Only ${stockForProduct} in stock — requested ${requestedForProduct}`
                       : stockForProduct <= 0
@@ -441,54 +586,37 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Fulfilment</h2>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label
-            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
-              fulfilment === "delivery"
-                ? "border-foreground bg-surface"
-                : "border-border bg-background hover:bg-surface"
-            }`}
-          >
-            <input
-              type="radio"
-              name="fulfilment"
-              value="delivery"
-              checked={fulfilment === "delivery"}
-              onChange={() => setFulfilment("delivery")}
-              className="sr-only"
-            />
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <Truck size={14} aria-hidden />
-              Delivery
-            </span>
-            <span className="block text-xs text-muted mt-0.5">
-              Ships to the customer&rsquo;s address
-            </span>
-          </label>
-          <label
-            className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
-              fulfilment === "collection"
-                ? "border-foreground bg-surface"
-                : "border-border bg-background hover:bg-surface"
-            }`}
-          >
-            <input
-              type="radio"
-              name="fulfilment"
-              value="collection"
-              checked={fulfilment === "collection"}
-              onChange={() => setFulfilment("collection")}
-              className="sr-only"
-            />
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <MapPin size={14} aria-hidden />
-              Self-collection
-            </span>
-            <span className="block text-xs text-muted mt-0.5">
-              {COLLECTION_ADDRESS.name}, {COLLECTION_ADDRESS.line1},{" "}
-              {COLLECTION_ADDRESS.city}
-            </span>
-          </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {fulfilmentOptions.map((opt) => {
+            const Icon = opt.icon;
+            const active = fulfilment === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className={`cursor-pointer rounded-lg border px-3 py-3 text-sm transition-colors ${
+                  active
+                    ? "border-foreground bg-surface"
+                    : "border-border bg-background hover:bg-surface"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="fulfilment"
+                  value={opt.value}
+                  checked={active}
+                  onChange={() => setFulfilment(opt.value)}
+                  className="sr-only"
+                />
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Icon size={14} aria-hidden />
+                  {opt.label}
+                </span>
+                <span className="block text-xs text-muted mt-0.5">
+                  {opt.hint}
+                </span>
+              </label>
+            );
+          })}
         </div>
         {fulfilment === "delivery" && (
           <>
@@ -579,12 +707,14 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
             <dt className="text-muted">Subtotal</dt>
             <dd>{formatZar(subtotal)}</dd>
           </div>
-          <div className="flex gap-3 justify-between sm:justify-start">
-            <dt className="text-muted">
-              {fulfilment === "collection" ? "Collection" : "Delivery"}
-            </dt>
-            <dd>{deliveryFee > 0 ? formatZar(deliveryFee) : "Free"}</dd>
-          </div>
+          {fulfilment !== "none" && (
+            <div className="flex gap-3 justify-between sm:justify-start">
+              <dt className="text-muted">
+                {fulfilment === "collection" ? "Collection" : "Delivery"}
+              </dt>
+              <dd>{deliveryFee > 0 ? formatZar(deliveryFee) : "Free"}</dd>
+            </div>
+          )}
           <div className="flex gap-3 justify-between sm:justify-start font-semibold pt-1 border-t border-border mt-1">
             <dt>Total</dt>
             <dd>{formatZar(subtotal + deliveryFee)}</dd>

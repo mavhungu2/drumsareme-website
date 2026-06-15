@@ -188,6 +188,42 @@ export async function markShipped(
   });
 }
 
+export interface MarkReadyToCollectInput {
+  collectorName?: string;
+  collectorContact?: string;
+  note?: string;
+}
+
+export interface MarkReadyToCollectResponse {
+  ok?: true;
+  already?: true;
+  collection?: {
+    collectorName?: string;
+    collectorContact?: string;
+    note?: string;
+  } | null;
+}
+
+/**
+ * Marks a self-collection order ready to collect. Hits the same endpoint as
+ * markShipped — the server branches on the stored fulfilment and accepts these
+ * OPTIONAL collector details instead of requiring courier tracking.
+ */
+export async function markReadyToCollect(
+  id: string,
+  input: MarkReadyToCollectInput,
+): Promise<MarkReadyToCollectResponse> {
+  if (!id) throw new AdminApiError(400, "Missing order id");
+  const url = buildUrl(
+    `/api/admin/orders/${encodeURIComponent(id)}/mark-shipped`,
+  );
+  return requestJson<MarkReadyToCollectResponse>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export async function addNote(
   id: string,
   body: string,
