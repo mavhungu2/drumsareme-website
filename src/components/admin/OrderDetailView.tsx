@@ -14,7 +14,12 @@ import {
   formatCollectionAddress,
   type Order,
 } from "@/lib/admin/orders-types";
-import { formatDate, formatDateTime, formatZar } from "@/lib/admin/format";
+import {
+  discountLabel,
+  formatDate,
+  formatDateTime,
+  formatZar,
+} from "@/lib/admin/format";
 import OrderStatusBadge from "./OrderStatusBadge";
 import AddNoteForm from "./AddNoteForm";
 
@@ -338,8 +343,7 @@ export default function OrderDetailView({
               {(order.discount ?? 0) > 0 && (
                 <tr>
                   <td colSpan={3} className="py-2 text-right text-green-700">
-                    Promo
-                    {order.promoCode ? ` (${order.promoCode})` : ""}
+                    {discountLabel(order)}
                   </td>
                   <td className="py-2 text-right tabular-nums text-green-700">
                     −{formatZar(order.discount ?? 0)}

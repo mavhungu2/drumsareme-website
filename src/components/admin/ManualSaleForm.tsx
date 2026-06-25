@@ -69,6 +69,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   const phoneId = useId();
   const emailId = useId();
   const notesId = useId();
+  const discountId = useId();
 
   // Live catalog merges baked products with Firestore so SKUs added via the
   // admin UI appear in the dropdown without a redeploy.
@@ -89,6 +90,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
   ]);
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [deliveryFeeInput, setDeliveryFeeInput] = useState("0");
+  const [discountPercentInput, setDiscountPercentInput] = useState("0");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickedCustomer, setPickedCustomer] = useState<PickerCustomer | null>(
@@ -130,6 +132,21 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
     () => rows.reduce((sum, row) => sum + lineTotalFor(row), 0),
     [rows, lineTotalFor],
   );
+
+  // Ad-hoc manual percentage discount (0–100), applied to the subtotal.
+  // Round to 2dp to mirror the server (adminManualSales validate()), so the
+  // live preview matches the saved invoice exactly.
+  const discountPercent =
+    Math.round(
+      Math.min(100, Math.max(0, Number.parseFloat(discountPercentInput) || 0)) *
+        100,
+    ) / 100;
+  const discountAmount =
+    Math.round(Math.min(subtotal, (subtotal * discountPercent) / 100) * 100) /
+    100;
+  const previewTotal =
+    Math.round((Math.max(0, subtotal - discountAmount) + deliveryFee) * 100) /
+    100;
 
   // Sum requested qty per productId so the same SKU on multiple rows is
   // checked against the combined total (matches what the server does).
@@ -235,6 +252,10 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         return setError("Delivery fee must be a non-negative number.");
       }
 
+      if (discountPercent < 0 || discountPercent > 100) {
+        return setError("Discount must be between 0 and 100%.");
+      }
+
       const addressLine1Trim = addressLine1.trim();
       const cityTrim = city.trim();
       const provinceTrim = province.trim();
@@ -263,6 +284,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           fulfilment,
           deliveryFee,
           notes: notes.trim() || undefined,
+          ...(discountPercent > 0 ? { discountPercent } : {}),
         };
         const response = await createManualSale(payload);
         onSubmitted(response);
@@ -282,6 +304,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
       addressLine1,
       city,
       deliveryFee,
+      discountPercent,
       email,
       firstName,
       fulfilment,
@@ -701,12 +724,43 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
         </label>
       </section>
 
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Discount</h2>
+        <label
+          htmlFor={discountId}
+          className="flex flex-col gap-1 text-xs font-medium text-muted"
+        >
+          <span>Percentage off the subtotal (optional)</span>
+          <div className="relative max-w-[8rem]">
+            <input
+              id={discountId}
+              type="number"
+              min={0}
+              max={100}
+              step={0.5}
+              value={discountPercentInput}
+              onChange={(e) => setDiscountPercentInput(e.target.value)}
+              className="h-10 w-full rounded-lg border border-border bg-background pl-3 pr-7 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">
+              %
+            </span>
+          </div>
+        </label>
+      </section>
+
       <section className="border-t border-border pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <dl className="text-sm text-foreground space-y-1 tabular-nums min-w-[12rem]">
           <div className="flex gap-3 justify-between sm:justify-start">
             <dt className="text-muted">Subtotal</dt>
             <dd>{formatZar(subtotal)}</dd>
           </div>
+          {discountAmount > 0 && (
+            <div className="flex gap-3 justify-between sm:justify-start text-green-700">
+              <dt>Discount ({discountPercent}%)</dt>
+              <dd>−{formatZar(discountAmount)}</dd>
+            </div>
+          )}
           {fulfilment !== "none" && (
             <div className="flex gap-3 justify-between sm:justify-start">
               <dt className="text-muted">
@@ -717,7 +771,7 @@ export default function ManualSaleForm({ onSubmitted }: ManualSaleFormProps) {
           )}
           <div className="flex gap-3 justify-between sm:justify-start font-semibold pt-1 border-t border-border mt-1">
             <dt>Total</dt>
-            <dd>{formatZar(subtotal + deliveryFee)}</dd>
+            <dd>{formatZar(previewTotal)}</dd>
           </div>
         </dl>
         <button

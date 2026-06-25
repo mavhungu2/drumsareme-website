@@ -93,6 +93,8 @@ export interface Order {
   discount?: number;
   /** Uppercased promo code applied to this order. */
   promoCode?: string;
+  /** Percentage behind an ad-hoc manual discount (display only). */
+  discountPercent?: number;
   shipping: number;
   total: number;
   customer: Customer;

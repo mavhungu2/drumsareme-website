@@ -681,11 +681,15 @@ const adminMarkPaid: Handler = async ({ req, res, uid, orderId }) => {
         }
       });
 
-      // Preserve any promo-code discount stored at order creation. Discount
-      // applies to subtotal; the new delivery fee is added on top.
+      // Preserve any discount (promo code or manual %) stored at order
+      // creation. Discount applies to subtotal; the new delivery fee is added
+      // on top. Round to exact cents to avoid float drift in the stored total.
       const discount = order.discount ?? 0;
       const total =
-        Math.max(0, (order.subtotal ?? 0) - discount) + input.deliveryFee;
+        Math.round(
+          (Math.max(0, (order.subtotal ?? 0) - discount) + input.deliveryFee) *
+            100,
+        ) / 100;
       // Collection orders skip the "shipped" step — the moment the customer
       // pays the goods are ready at Spring Glade. Stamp shippedAt alongside
       // paidAt so the timeline reflects both events.

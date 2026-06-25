@@ -4,7 +4,7 @@ import Image from "next/image";
 import type { Order } from "@/lib/admin/orders-types";
 import { COLLECTION_ADDRESS } from "@/lib/admin/orders-types";
 import { BUSINESS_INFO } from "@/lib/admin/business-info";
-import { formatDate, formatZar } from "@/lib/admin/format";
+import { discountLabel, formatDate, formatZar } from "@/lib/admin/format";
 
 interface InvoiceProps {
   order: Order;
@@ -218,10 +218,7 @@ export default function Invoice({ order }: InvoiceProps) {
           </div>
           {(order.discount ?? 0) > 0 && (
             <div className="flex justify-between text-green-700">
-              <span>
-                Promo
-                {order.promoCode ? ` (${order.promoCode})` : ""}
-              </span>
+              <span>{discountLabel(order)}</span>
               <span className="tabular-nums">
                 −{formatZar(order.discount ?? 0)}
               </span>

@@ -1,4 +1,4 @@
-import type { OrderStatus } from "./orders-types";
+import type { Order, OrderStatus } from "./orders-types";
 
 const ZAR_FORMATTER = new Intl.NumberFormat("en-ZA", {
   style: "currency",
@@ -31,6 +31,20 @@ export function formatDate(iso: string | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return DATE_ONLY_FORMATTER.format(date);
+}
+
+/**
+ * Label for an order's discount line — kept in sync with the server's
+ * functions/src/lib/discount.ts: "Promo (CODE)" | "Discount (10%)" | "Discount".
+ */
+export function discountLabel(
+  order: Pick<Order, "promoCode" | "discountPercent">,
+): string {
+  if (order.promoCode) return `Promo (${order.promoCode})`;
+  if (typeof order.discountPercent === "number" && order.discountPercent > 0) {
+    return `Discount (${order.discountPercent}%)`;
+  }
+  return "Discount";
 }
 
 /**

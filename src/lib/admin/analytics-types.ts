@@ -88,6 +88,8 @@ export interface ManualSaleInput {
   deliveryFee: number;
   notes?: string;
   promoCode?: string;
+  /** Ad-hoc manual percentage discount (0 < p <= 100). */
+  discountPercent?: number;
 }
 
 export interface ManualSaleResponse {

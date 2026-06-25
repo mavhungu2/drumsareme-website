@@ -101,6 +101,13 @@ export interface Order {
   discount?: number;
   /** Promo code used on this order, uppercased. Matches `promoCodes/{code}`. */
   promoCode?: string;
+  /**
+   * Percentage behind an ad-hoc manual discount (e.g. 10 for 10% off). Set
+   * only when the admin applied a manual percentage discount on a manual sale
+   * — promo-code discounts leave this unset and carry `promoCode` instead.
+   * Purely for display; `discount` is the authoritative ZAR amount.
+   */
+  discountPercent?: number;
   shipping: number;
   total: number;
   /**

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { COLLECTION_ADDRESS, type Order, type OrderTracking } from "./firestore";
+import { discountLabel } from "./discount";
 import { generateInvoicePdf } from "./invoicePdf";
 
 async function buildPdfAttachment(order: Order, paid: boolean) {
@@ -76,7 +77,7 @@ function orderBodyHtml(order: Order, intro: string): string {
   const discount = order.discount ?? 0;
   const discountRow =
     discount > 0
-      ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
+      ? `<tr><td style="padding:6px 0;color:#047857">${escapeHtml(discountLabel(order))}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
       : "";
   // Service ("none") invoices have no shipping concept — omit the row entirely.
   const shippingRow =
@@ -102,7 +103,7 @@ function invoiceBodyHtml(order: Order): string {
   const discount = order.discount ?? 0;
   const discountRow =
     discount > 0
-      ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
+      ? `<tr><td style="padding:6px 0;color:#047857">${escapeHtml(discountLabel(order))}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(discount)}</td></tr>`
       : "";
   // Match the attached PDF + admin surfaces: omit only for service ("none")
   // invoices; collection/free-delivery still show the row labelled "Free".
@@ -233,7 +234,7 @@ function cancellationBodyHtml(order: Order, reason: string): string {
       <tr><td style="padding:6px 0;border-top:1px solid #e5e7eb">Subtotal</td><td style="padding:6px 0;text-align:right;border-top:1px solid #e5e7eb">${formatZAR(order.subtotal)}</td></tr>
       ${
         (order.discount ?? 0) > 0
-          ? `<tr><td style="padding:6px 0;color:#047857">Promo${order.promoCode ? ` (${escapeHtml(order.promoCode)})` : ""}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(order.discount ?? 0)}</td></tr>`
+          ? `<tr><td style="padding:6px 0;color:#047857">${escapeHtml(discountLabel(order))}</td><td style="padding:6px 0;text-align:right;color:#047857">−${formatZAR(order.discount ?? 0)}</td></tr>`
           : ""
       }
       ${shippingRow}

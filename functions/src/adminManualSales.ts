@@ -47,6 +47,8 @@ interface ManualSaleInput {
   deliveryFee: number;
   notes?: string;
   promoCode?: string;
+  /** Ad-hoc manual percentage discount (0 < p <= 100). */
+  discountPercent?: number;
 }
 
 const MAX_SERVICE_DESC_LEN = 200;
@@ -103,6 +105,7 @@ function validate(
     deliveryFee,
     notes,
     promoCode,
+    discountPercent,
     ...extra
   } = body;
   if (Object.keys(extra).length > 0) {
@@ -118,6 +121,30 @@ function validate(
       return { ok: false, error: "promoCode too long" };
     }
     if (trimmed.length > 0) promoCodeClean = trimmed;
+  }
+
+  let discountPercentClean: number | undefined;
+  if (discountPercent !== undefined && discountPercent !== null) {
+    if (
+      typeof discountPercent !== "number" ||
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100
+    ) {
+      return {
+        ok: false,
+        error: "discountPercent must be a number between 0 and 100",
+      };
+    }
+    // Round to 2 decimals so e.g. 12.5% is allowed but noise is trimmed.
+    const rounded = Math.round(discountPercent * 100) / 100;
+    if (rounded > 0) discountPercentClean = rounded;
+  }
+  if (promoCodeClean && discountPercentClean) {
+    return {
+      ok: false,
+      error: "Use either a promo code or a manual discount, not both",
+    };
   }
 
   let fulfilment: Fulfilment = "delivery";
@@ -291,6 +318,7 @@ function validate(
       deliveryFee: deliveryFeeClean,
       notes: notesClean,
       promoCode: promoCodeClean,
+      discountPercent: discountPercentClean,
     },
   };
 }
@@ -341,6 +369,8 @@ async function createManualSale(
     });
     subtotal += lineTotal;
   }
+  // Normalize after float accumulation so cents are exact downstream.
+  subtotal = Math.round(subtotal * 100) / 100;
 
   // Reject up front if any tracked SKU has insufficient stock. Service lines
   // (no productId) carry no inventory and are skipped entirely. Untracked
@@ -405,9 +435,11 @@ async function createManualSale(
     postalCode: customer.postalCode,
   });
 
-  // Apply promo code if one was supplied (re-validates server-side).
+  // Apply a discount: either a promo code (re-validated server-side) OR an
+  // ad-hoc manual percentage. validate() guarantees at most one is set.
   let discount = 0;
   let promoCode: string | undefined;
+  let discountPercent: number | undefined;
   if (input.promoCode) {
     const promoResult = await validatePromoCode({
       code: input.promoCode,
@@ -420,12 +452,20 @@ async function createManualSale(
     }
     discount = promoResult.discount;
     promoCode = promoResult.code;
+  } else if (input.discountPercent) {
+    discount =
+      Math.round(
+        Math.min(subtotal, (subtotal * input.discountPercent) / 100) * 100,
+      ) / 100;
+    if (discount > 0) discountPercent = input.discountPercent;
   }
 
   // Pending draft: fulfilment + delivery fee captured up front so the
   // emailed invoice has the right total. Payment method and the inventory
   // decrement are still deferred to the Mark as Paid action.
-  const total = Math.max(0, subtotal - discount) + input.deliveryFee;
+  const total =
+    Math.round((Math.max(0, subtotal - discount) + input.deliveryFee) * 100) /
+    100;
   await orderDoc.set({
     ref,
     status: "pending",
@@ -436,6 +476,7 @@ async function createManualSale(
     subtotal,
     ...(discount > 0 ? { discount } : {}),
     ...(promoCode ? { promoCode } : {}),
+    ...(discountPercent ? { discountPercent } : {}),
     shipping: input.deliveryFee,
     total,
     customerId,

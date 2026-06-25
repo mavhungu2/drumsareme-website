@@ -11,6 +11,7 @@ import {
   COLLECTION_ADDRESS,
   type Order,
 } from "./firestore";
+import { discountLabel } from "./discount";
 
 const LOGO_URL =
   "https://drumsareme.co.za/images/logos/logo-black-trimmed.png";
@@ -428,10 +429,7 @@ export async function generateInvoicePdf(order: Order): Promise<Buffer> {
     const discount = order.discount ?? 0;
     if (discount > 0) {
       tY = doc.y + 4;
-      const promoLabel = order.promoCode
-        ? `Promo (${order.promoCode})`
-        : "Promo";
-      doc.fillColor("#047857").text(promoLabel, totalsLabelX, tY);
+      doc.fillColor("#047857").text(discountLabel(order), totalsLabelX, tY);
       doc.fillColor("#047857").text(`-${formatZAR(discount)}`, totalsValueX, tY, {
         width: totalsValueWidth,
         align: "right",
