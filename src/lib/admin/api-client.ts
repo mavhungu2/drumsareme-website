@@ -7,6 +7,8 @@ import type {
   RemoveAdminResponse,
 } from "./admins-types";
 import type {
+  EditOrderInput,
+  EditOrderResponse,
   ListOrdersQuery,
   ListOrdersResponse,
   Order,
@@ -218,6 +220,19 @@ export async function markReadyToCollect(
     `/api/admin/orders/${encodeURIComponent(id)}/mark-shipped`,
   );
   return requestJson<MarkReadyToCollectResponse>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function editOrder(
+  id: string,
+  input: EditOrderInput,
+): Promise<EditOrderResponse> {
+  if (!id) throw new AdminApiError(400, "Missing order id");
+  const url = buildUrl(`/api/admin/orders/${encodeURIComponent(id)}/edit`);
+  return requestJson<EditOrderResponse>(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

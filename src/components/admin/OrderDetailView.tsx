@@ -6,12 +6,14 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Pencil,
   Truck,
 } from "lucide-react";
 import {
   COLLECTION_ADDRESS,
   MANUAL_PAYMENT_METHOD_LABEL,
   formatCollectionAddress,
+  isOrderEditable,
   type Order,
 } from "@/lib/admin/orders-types";
 import {
@@ -258,6 +260,15 @@ export default function OrderDetailView({
                 )}
                 Mark as completed
               </button>
+            ) : null}
+            {isOrderEditable(order) ? (
+              <Link
+                href={`/admin/orders/edit/?id=${encodeURIComponent(order.id)}`}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <Pencil size={14} aria-hidden />
+                Edit order
+              </Link>
             ) : null}
             <Link
               href={`/admin/orders/invoice/?id=${encodeURIComponent(order.id)}`}

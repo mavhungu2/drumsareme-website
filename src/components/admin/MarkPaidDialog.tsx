@@ -29,6 +29,12 @@ interface MarkPaidDialogProps {
    * for payment method and records fulfilment "none" with no delivery fee.
    */
   isService?: boolean;
+  /**
+   * Prefill for the delivery-fee input (typically the order's stored
+   * shipping), so a fee set at creation or via Edit order isn't silently
+   * zeroed when marking paid.
+   */
+  initialDeliveryFee?: number;
 }
 
 const PAYMENTS: ManualPaymentMethod[] = ["cash", "card", "eft"];
@@ -42,6 +48,7 @@ export default function MarkPaidDialog({
   onClose,
   onMarked,
   isService = false,
+  initialDeliveryFee = 0,
 }: MarkPaidDialogProps) {
   const titleId = useId();
   const paymentId = useId();
@@ -59,10 +66,10 @@ export default function MarkPaidDialog({
     if (!open) return;
     setPaymentMethod("cash");
     setFulfilment("delivery");
-    setDeliveryFee("0");
+    setDeliveryFee(String(initialDeliveryFee ?? 0));
     setSubmitting(false);
     setError(null);
-  }, [open]);
+  }, [open, initialDeliveryFee]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {

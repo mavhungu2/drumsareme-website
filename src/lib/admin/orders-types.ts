@@ -141,6 +141,59 @@ export interface ListOrdersQuery {
   cursor?: string;
 }
 
+/**
+ * Mirror of the edit-order endpoint input (functions/src/adminOrderActions.ts
+ * adminEditOrder). All fields optional; at least one required.
+ */
+export type EditOrderItemInput =
+  | { productId: string; qty: number }
+  | { description: string; qty: number; unitPrice: number };
+
+export interface EditOrderCustomerInput {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  addressLine1?: string;
+  suburb?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  notes?: string;
+}
+
+export interface EditOrderInput {
+  customer?: EditOrderCustomerInput;
+  items?: EditOrderItemInput[];
+  deliveryFee?: number;
+  /** 0 clears the manual discount. Rejected when the order has a promoCode. */
+  discountPercent?: number;
+}
+
+export interface EditOrderResponse {
+  ok: true;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  total: number;
+}
+
+/**
+ * An order is editable while it hasn't completed/cancelled — except pending
+ * Yoco orders, whose customer may be mid-payment on the current total.
+ */
+export function isOrderEditable(order: {
+  status: OrderStatus;
+  source?: OrderSource;
+}): boolean {
+  const statusOk =
+    order.status === "pending" ||
+    order.status === "paid" ||
+    order.status === "shipped";
+  if (!statusOk) return false;
+  return !(order.source === "yoco" && order.status === "pending");
+}
+
 export const ORDER_STATUSES: ReadonlyArray<OrderStatus> = [
   "pending",
   "paid",

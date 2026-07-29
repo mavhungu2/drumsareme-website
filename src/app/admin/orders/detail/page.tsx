@@ -298,6 +298,7 @@ function OrderDetailContent() {
         onClose={() => setPaidDialogOpen(false)}
         onMarked={handleMarkedPaid}
         isService={order.fulfilment === "none"}
+        initialDeliveryFee={order.shipping ?? 0}
       />
       {order.fulfilment === "collection" ? (
         <MarkReadyToCollectDialog

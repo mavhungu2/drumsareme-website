@@ -6,6 +6,7 @@ import {
   db,
   FieldValue,
   Timestamp,
+  type Customer,
   type Fulfilment,
   type InventoryItem,
   type ManualPaymentMethod,
@@ -14,10 +15,18 @@ import {
   type OrderItem,
   type OrderNote,
   type OrderTracking,
+  type PromoCode,
 } from "./lib/firestore";
 import { ADMIN_EMAILS, requireAdmin } from "./lib/auth";
 import { applyCors } from "./lib/cors";
+import { computePercentDiscount, round2 } from "./lib/discount";
 import { InsufficientStockError } from "./lib/errors";
+import {
+  buildOrderItems,
+  validateItemsInput,
+  type ItemInput,
+} from "./lib/orderItems";
+import { computeDiscount } from "./lib/promo";
 import {
   sendCancellationNotification,
   sendCustomerInvoice,
@@ -940,6 +949,501 @@ const adminResendReceipt: Handler = async ({ res, uid, orderId }) => {
   res.status(200).json({ ok: true, sentAt, mode: result.mode });
 };
 
+// ===========================================================================
+// Edit order (status pending | paid | shipped)
+// ===========================================================================
+
+const EDIT_MAX_NAME_LEN = 120;
+const EDIT_MAX_PHONE_LEN = 30;
+const EDIT_MAX_ADDRESS_LEN = 200;
+const EDIT_MAX_CUSTOMER_NOTES_LEN = 500;
+const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
+
+interface EditCustomerFields {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  addressLine1?: string;
+  suburb?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  notes?: string;
+}
+
+interface EditOrderInput {
+  customer?: EditCustomerFields;
+  items?: ItemInput[];
+  deliveryFee?: number;
+  discountPercent?: number;
+}
+
+function validateEditCustomer(
+  raw: unknown,
+): { ok: true; customer: EditCustomerFields } | { ok: false; error: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "customer must be an object" };
+  }
+  const c = raw as Record<string, unknown>;
+  const allowed = [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "addressLine1",
+    "suburb",
+    "city",
+    "province",
+    "postalCode",
+    "notes",
+  ] as const;
+  for (const k of Object.keys(c)) {
+    if (!(allowed as readonly string[]).includes(k)) {
+      return { ok: false, error: `Unexpected customer field: ${k}` };
+    }
+  }
+  const out: EditCustomerFields = {};
+  // Identity fields cannot be blanked; optional fields blank = clear.
+  const rules: Array<{
+    key: keyof EditCustomerFields;
+    max: number;
+    required: boolean;
+  }> = [
+    { key: "firstName", max: EDIT_MAX_NAME_LEN, required: true },
+    { key: "lastName", max: EDIT_MAX_NAME_LEN, required: false },
+    { key: "phone", max: EDIT_MAX_PHONE_LEN, required: true },
+    { key: "addressLine1", max: EDIT_MAX_ADDRESS_LEN, required: false },
+    { key: "suburb", max: EDIT_MAX_ADDRESS_LEN, required: false },
+    { key: "city", max: EDIT_MAX_ADDRESS_LEN, required: false },
+    { key: "province", max: EDIT_MAX_ADDRESS_LEN, required: false },
+    { key: "postalCode", max: EDIT_MAX_ADDRESS_LEN, required: false },
+    { key: "notes", max: EDIT_MAX_CUSTOMER_NOTES_LEN, required: false },
+  ];
+  for (const rule of rules) {
+    const value = c[rule.key];
+    if (value === undefined) continue;
+    if (typeof value !== "string") {
+      return { ok: false, error: `${rule.key} must be a string` };
+    }
+    const trimmed = value.trim();
+    if (rule.required && trimmed.length === 0) {
+      return { ok: false, error: `${rule.key} cannot be blank` };
+    }
+    if (trimmed.length > rule.max) {
+      return { ok: false, error: `${rule.key} too long` };
+    }
+    out[rule.key] = trimmed;
+  }
+  if (c.email !== undefined) {
+    if (typeof c.email !== "string") {
+      return { ok: false, error: "email must be a string" };
+    }
+    const trimmed = c.email.trim();
+    if (trimmed.length > 0 && !EMAIL_PATTERN.test(trimmed)) {
+      return { ok: false, error: "Invalid email" };
+    }
+    out.email = trimmed;
+  }
+  if (Object.keys(out).length === 0) {
+    return { ok: false, error: "customer has no fields to update" };
+  }
+  return { ok: true, customer: out };
+}
+
+function validateEditInput(
+  body: Record<string, unknown>,
+): { ok: true; input: EditOrderInput } | { ok: false; error: string } {
+  const { customer, items, deliveryFee, discountPercent, ...extra } = body;
+  if (Object.keys(extra).length > 0) {
+    return { ok: false, error: `Unexpected field: ${Object.keys(extra)[0]}` };
+  }
+  const input: EditOrderInput = {};
+
+  if (customer !== undefined) {
+    const check = validateEditCustomer(customer);
+    if (!check.ok) return check;
+    input.customer = check.customer;
+  }
+  if (items !== undefined) {
+    const check = validateItemsInput(items);
+    if (!check.ok) return check;
+    input.items = check.items;
+  }
+  if (deliveryFee !== undefined) {
+    if (
+      typeof deliveryFee !== "number" ||
+      !Number.isFinite(deliveryFee) ||
+      deliveryFee < 0
+    ) {
+      return { ok: false, error: "deliveryFee must be a non-negative number" };
+    }
+    input.deliveryFee = round2(deliveryFee);
+  }
+  if (discountPercent !== undefined && discountPercent !== null) {
+    if (
+      typeof discountPercent !== "number" ||
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100
+    ) {
+      return {
+        ok: false,
+        error: "discountPercent must be a number between 0 and 100",
+      };
+    }
+    input.discountPercent = round2(discountPercent);
+  }
+
+  if (
+    input.customer === undefined &&
+    input.items === undefined &&
+    input.deliveryFee === undefined &&
+    input.discountPercent === undefined
+  ) {
+    return { ok: false, error: "Nothing to update" };
+  }
+  return { ok: true, input };
+}
+
+function mergeCustomer(
+  existing: Customer,
+  updates: EditCustomerFields,
+): Customer {
+  const pick = (next: string | undefined, current: string | undefined) =>
+    next !== undefined ? next : (current ?? "");
+  const merged: Customer = {
+    firstName: pick(updates.firstName, existing.firstName),
+    lastName: pick(updates.lastName, existing.lastName),
+    email: pick(updates.email, existing.email),
+    phone: pick(updates.phone, existing.phone),
+    addressLine1: pick(updates.addressLine1, existing.addressLine1),
+    city: pick(updates.city, existing.city),
+    province: pick(updates.province, existing.province),
+    postalCode: pick(updates.postalCode, existing.postalCode),
+  };
+  const suburb =
+    updates.suburb !== undefined ? updates.suburb : (existing.suburb ?? "");
+  if (suburb) merged.suburb = suburb;
+  const notes =
+    updates.notes !== undefined ? updates.notes : (existing.notes ?? "");
+  if (notes) merged.notes = notes;
+  return merged;
+}
+
+const adminEditOrder: Handler = async ({ req, res, uid, orderId }) => {
+  const parsed = parseJsonBody(req);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const validated = validateEditInput(parsed.body);
+  if (!validated.ok) {
+    res.status(400).json({ error: validated.error });
+    return;
+  }
+  const { input } = validated;
+
+  // Resolve product prices before the transaction (catalog reads are cached
+  // and not part of the atomic order/inventory state).
+  let built:
+    | { orderItems: OrderItem[]; subtotal: number }
+    | undefined;
+  if (input.items) {
+    const result = await buildOrderItems(input.items);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    built = { orderItems: result.orderItems, subtotal: result.subtotal };
+  }
+
+  const orderRef = db.collection("orders").doc(orderId);
+
+  interface EditOutcome {
+    subtotal: number;
+    discount: number;
+    shipping: number;
+    total: number;
+    prevTotal: number;
+    changed: string[];
+  }
+  type TxResult =
+    | { kind: "not-found" }
+    | { kind: "bad-status"; status: Order["status"] }
+    | { kind: "pending-yoco" }
+    | { kind: "bad-fee" }
+    | { kind: "has-promo" }
+    | { kind: "ok"; outcome: EditOutcome };
+
+  try {
+    const result = await db.runTransaction<TxResult>(async (tx) => {
+      const snap = await tx.get(orderRef);
+      if (!snap.exists) return { kind: "not-found" };
+      const order = snap.data() as Order;
+
+      const editableStatus =
+        order.status === "pending" ||
+        order.status === "paid" ||
+        order.status === "shipped";
+      if (!editableStatus) return { kind: "bad-status", status: order.status };
+      // A pending Yoco order means the customer may be mid-payment for the
+      // CURRENT total — editing it would race the live checkout session.
+      if (order.source === "yoco" && order.status === "pending") {
+        return { kind: "pending-yoco" };
+      }
+      if (
+        input.deliveryFee !== undefined &&
+        order.fulfilment !== "delivery" &&
+        input.deliveryFee > 0
+      ) {
+        return { kind: "bad-fee" };
+      }
+      if (input.discountPercent !== undefined && order.promoCode) {
+        return { kind: "has-promo" };
+      }
+
+      const newItems = built ? built.orderItems : (order.items ?? []);
+      const newSubtotal = built ? built.subtotal : round2(order.subtotal ?? 0);
+
+      // --- Reads (all must precede writes in a Firestore transaction) ---
+      let promo: PromoCode | undefined;
+      if (order.promoCode && built) {
+        const promoSnap = await tx.get(
+          db.doc(`promoCodes/${order.promoCode}`),
+        );
+        if (promoSnap.exists) promo = promoSnap.data() as PromoCode;
+      }
+
+      interface InventoryOp {
+        ref: FirebaseFirestore.DocumentReference;
+        delta: number;
+        name: string;
+        snap: FirebaseFirestore.DocumentSnapshot;
+      }
+      let inventoryOps: InventoryOp[] = [];
+      if (order.inventoryApplied === true && built) {
+        const oldQty = new Map<string, number>();
+        const names = new Map<string, string>();
+        for (const it of order.items ?? []) {
+          if (!it.productId) continue;
+          oldQty.set(it.productId, (oldQty.get(it.productId) ?? 0) + it.qty);
+          names.set(it.productId, it.name);
+        }
+        const newQty = new Map<string, number>();
+        for (const it of newItems) {
+          if (!it.productId) continue;
+          newQty.set(it.productId, (newQty.get(it.productId) ?? 0) + it.qty);
+          names.set(it.productId, it.name);
+        }
+        const union = new Set([...oldQty.keys(), ...newQty.keys()]);
+        const entries = [...union]
+          .map((pid) => ({
+            pid,
+            delta: (newQty.get(pid) ?? 0) - (oldQty.get(pid) ?? 0),
+            name: names.get(pid) ?? pid,
+            ref: db.collection("inventory").doc(pid),
+          }))
+          .filter((e) => e.delta !== 0);
+        const snaps = await Promise.all(entries.map((e) => tx.get(e.ref)));
+        entries.forEach((e, i) => {
+          const invSnap = snaps[i];
+          if (e.delta > 0 && invSnap.exists) {
+            const inv = invSnap.data() as InventoryItem;
+            const available = Math.max(
+              0,
+              (inv.openingStock ?? 0) - (inv.unitsSold ?? 0),
+            );
+            if (e.delta > available) {
+              throw new InsufficientStockError(e.name, available);
+            }
+          }
+        });
+        inventoryOps = entries.map((e, i) => ({
+          ref: e.ref,
+          delta: e.delta,
+          name: e.name,
+          snap: snaps[i],
+        }));
+      }
+
+      // --- Discount recompute ---
+      const prevDiscount = order.discount ?? 0;
+      let discount: number;
+      let percentToStore: number | undefined;
+      if (order.promoCode) {
+        // Promo stays attached; its ZAR value scales with the new subtotal.
+        // If the promo doc was deleted since purchase, preserve the original
+        // discount capped at the new subtotal.
+        discount = built
+          ? promo
+            ? computeDiscount(promo, newSubtotal)
+            : round2(Math.min(prevDiscount, newSubtotal))
+          : prevDiscount;
+      } else {
+        const pct =
+          input.discountPercent !== undefined
+            ? input.discountPercent
+            : (order.discountPercent ?? 0);
+        if (pct > 0) {
+          discount = computePercentDiscount(newSubtotal, pct);
+          if (discount > 0) percentToStore = pct;
+        } else if (input.discountPercent !== undefined) {
+          // Explicit 0 clears any manual discount.
+          discount = 0;
+        } else {
+          // Legacy bare amount (no pct, no promo): preserve, capped.
+          discount = round2(Math.min(prevDiscount, newSubtotal));
+        }
+      }
+
+      const shipping =
+        order.fulfilment === "delivery"
+          ? input.deliveryFee !== undefined
+            ? input.deliveryFee
+            : (order.shipping ?? 0)
+          : 0;
+      const total = round2(Math.max(0, newSubtotal - discount) + shipping);
+      const prevTotal = order.total ?? 0;
+
+      const changed: string[] = [];
+      if (built) changed.push("items");
+      if (input.customer) changed.push("customer details");
+      if (
+        input.deliveryFee !== undefined &&
+        input.deliveryFee !== (order.shipping ?? 0)
+      ) {
+        changed.push("delivery fee");
+      }
+      if (input.discountPercent !== undefined) changed.push("discount");
+
+      // --- Writes ---
+      for (const op of inventoryOps) {
+        if (op.snap.exists) {
+          const inv = op.snap.data() as InventoryItem;
+          const nextSold = Math.max(0, (inv.unitsSold ?? 0) + op.delta);
+          const nextStock = Math.max(0, (inv.openingStock ?? 0) - nextSold);
+          tx.update(op.ref, {
+            unitsSold: nextSold,
+            currentStock: nextStock,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else if (op.delta > 0) {
+          tx.set(op.ref, {
+            productId: op.ref.id,
+            name: op.name,
+            openingStock: 0,
+            unitsSold: op.delta,
+            currentStock: 0,
+            reorderLevel: 0,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      const editNote: OrderNote = {
+        at: Timestamp.now(),
+        by: uid,
+        body: `Order edited (${changed.join(", ") || "no visible changes"}). Total R${prevTotal.toFixed(2)} → R${total.toFixed(2)}.`,
+      };
+      const updates: Record<string, unknown> = {
+        subtotal: newSubtotal,
+        shipping,
+        total,
+        discount: discount > 0 ? discount : FieldValue.delete(),
+        notes: FieldValue.arrayUnion(editNote),
+      };
+      if (built) updates.items = newItems;
+      if (input.customer) {
+        updates.customer = mergeCustomer(order.customer, input.customer);
+      }
+      if (!order.promoCode) {
+        if (percentToStore !== undefined) {
+          updates.discountPercent = percentToStore;
+        } else {
+          updates.discountPercent = FieldValue.delete();
+        }
+      }
+      tx.update(orderRef, updates);
+
+      return {
+        kind: "ok",
+        outcome: {
+          subtotal: newSubtotal,
+          discount,
+          shipping,
+          total,
+          prevTotal,
+          changed,
+        },
+      };
+    });
+
+    if (result.kind === "not-found") {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (result.kind === "bad-status") {
+      res.status(409).json({
+        error: `Cannot edit a ${result.status} order`,
+      });
+      return;
+    }
+    if (result.kind === "pending-yoco") {
+      res.status(409).json({
+        error:
+          "Cannot edit a pending online order — the customer may be completing payment",
+      });
+      return;
+    }
+    if (result.kind === "bad-fee") {
+      res.status(400).json({
+        error: "deliveryFee must be 0 for collection and service orders",
+      });
+      return;
+    }
+    if (result.kind === "has-promo") {
+      res.status(400).json({
+        error:
+          "Order has a promo code — a manual discount cannot be combined with it",
+      });
+      return;
+    }
+
+    logger.info("adminOrderActions", {
+      uid,
+      action: "edit",
+      orderId,
+      changed: result.outcome.changed,
+      prevTotal: result.outcome.prevTotal,
+      total: result.outcome.total,
+    });
+    res.status(200).json({
+      ok: true,
+      subtotal: result.outcome.subtotal,
+      discount: result.outcome.discount,
+      shipping: result.outcome.shipping,
+      total: result.outcome.total,
+    });
+  } catch (err) {
+    if (err instanceof InsufficientStockError) {
+      logger.info("adminOrderActions edit rejected — insufficient stock", {
+        uid,
+        orderId,
+        product: err.productName,
+        available: err.available,
+      });
+      res.status(409).json({
+        error: err.message,
+        available: err.available,
+        productName: err.productName,
+      });
+      return;
+    }
+    throw err;
+  }
+};
+
 // Route table: first match wins. Leading segment is always the orderId, so
 // `subPath` is the remainder (empty string = bare detail route).
 const ROUTES: Array<{
@@ -977,6 +1481,10 @@ const ROUTES: Array<{
         handler: adminMarkCompleted,
       },
     ],
+  },
+  {
+    subPath: "edit",
+    entries: [{ method: "POST", action: "edit", handler: adminEditOrder }],
   },
   {
     subPath: "notes",
