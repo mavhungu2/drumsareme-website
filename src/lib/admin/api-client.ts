@@ -405,6 +405,7 @@ export async function listExpenses(
   const url = buildUrl("/api/admin/expenses", {
     from: params.from,
     to: params.to,
+    type: params.type,
     limit: params.limit,
   });
   return requestJson<ListExpensesResponse>(url, { method: "GET" });

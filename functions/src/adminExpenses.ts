@@ -5,6 +5,7 @@ import {
   db,
   FieldValue,
   Timestamp,
+  AggregateField,
   type Expense,
   type ExpenseType,
 } from "./lib/firestore";
@@ -78,6 +79,7 @@ function toListItem(id: string, expense: Expense): ExpenseListItem {
 interface ListQuery {
   from?: Timestamp;
   to?: Timestamp;
+  type?: ExpenseType;
   limit: number;
 }
 
@@ -105,13 +107,22 @@ function parseListQuery(
   if (rawQuery.from && !from) return "Invalid 'from' date";
   const to = parseIsoTimestamp(firstQueryValue(rawQuery.to));
   if (rawQuery.to && !to) return "Invalid 'to' date";
+  const typeRaw = firstQueryValue(rawQuery.type);
+  let type: ExpenseType | undefined;
+  // "" / "all" mean no type filter, so the UI can send its select value as-is.
+  if (typeRaw !== undefined && typeRaw !== "" && typeRaw !== "all") {
+    if (!VALID_TYPES.includes(typeRaw as ExpenseType)) {
+      return `type must be one of ${VALID_TYPES.join(", ")}`;
+    }
+    type = typeRaw as ExpenseType;
+  }
   const limitRaw = firstQueryValue(rawQuery.limit);
   const parsed = limitRaw ? Number.parseInt(limitRaw, 10) : DEFAULT_LIMIT;
   const limit =
     Number.isFinite(parsed) && parsed > 0
       ? Math.min(parsed, MAX_LIMIT)
       : DEFAULT_LIMIT;
-  return { from, to, limit };
+  return { from, to, type, limit };
 }
 
 async function listExpenses(req: Request, res: Response): Promise<void> {
@@ -123,18 +134,52 @@ async function listExpenses(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  let q: FirebaseFirestore.Query = db
-    .collection("expenses")
-    .orderBy("date", "desc");
-  if (parsed.from) q = q.where("date", ">=", parsed.from);
-  if (parsed.to) q = q.where("date", "<=", parsed.to);
+  // One base query drives both the page of rows AND the summary, so the
+  // totals always describe exactly the filtered set.
+  let base: FirebaseFirestore.Query = db.collection("expenses");
+  if (parsed.type) base = base.where("type", "==", parsed.type);
+  if (parsed.from) base = base.where("date", ">=", parsed.from);
+  if (parsed.to) base = base.where("date", "<=", parsed.to);
 
-  const snap = await q.limit(parsed.limit).get();
+  const snap = await base.orderBy("date", "desc").limit(parsed.limit).get();
   const items = snap.docs.map((doc) =>
     toListItem(doc.id, doc.data() as Expense),
   );
 
-  res.status(200).json({ items });
+  // Aggregate over the WHOLE filtered set, not just this page — otherwise the
+  // displayed total silently under-reports once the row cap is hit.
+  let total = 0;
+  let count = items.length;
+  let exact = true;
+  try {
+    const agg = await base
+      .aggregate({
+        total: AggregateField.sum("amount"),
+        count: AggregateField.count(),
+      })
+      .get();
+    const data = agg.data();
+    total = Math.round((data.total ?? 0) * 100) / 100;
+    count = data.count ?? items.length;
+  } catch (err) {
+    // Missing composite index or aggregation unavailable: fall back to the
+    // page sum and flag it so the UI can say the total may be partial.
+    logger.warn("adminExpenses aggregate failed — falling back to page sum", {
+      err: String(err),
+    });
+    total =
+      Math.round(items.reduce((sum, i) => sum + i.amount, 0) * 100) / 100;
+    exact = items.length < parsed.limit;
+  }
+
+  res.status(200).json({
+    items,
+    total,
+    count,
+    // True when more rows match than were returned in `items`.
+    truncated: count > items.length,
+    exact,
+  });
 }
 
 interface CreateInput {
