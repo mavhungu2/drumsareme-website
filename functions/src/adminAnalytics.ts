@@ -5,6 +5,7 @@ import {
   db,
   Timestamp,
   type Expense,
+  type ExpenseType,
   type InventoryItem,
   type ManualPaymentMethod,
   type Order,
@@ -51,6 +52,23 @@ interface LowStockItem {
   reorderLevel: number;
 }
 
+interface ExpenseTypeBreakdown {
+  type: ExpenseType;
+  total: number;
+  count: number;
+  /** Fraction of totalExpenses in range (0..1). */
+  share: number;
+}
+
+interface ExpenseDescriptionBreakdown {
+  description: string;
+  /** Every expense type this description was filed under, sorted. */
+  types: ExpenseType[];
+  total: number;
+  count: number;
+  share: number;
+}
+
 interface AnalyticsResponse {
   range: { from: string | null; to: string | null };
   kpis: {
@@ -69,6 +87,8 @@ interface AnalyticsResponse {
   customers: CustomerAggregate[];
   topCustomers: CustomerAggregate[];
   lowStock: LowStockItem[];
+  expensesByType: ExpenseTypeBreakdown[];
+  expensesByDescription: ExpenseDescriptionBreakdown[];
 }
 
 function firstQueryValue(
@@ -218,10 +238,69 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
   });
 
   let totalExpenses = 0;
+  const expenseTypeMap = new Map<
+    ExpenseType,
+    { total: number; count: number }
+  >();
+  const expenseDescMap = new Map<
+    string,
+    {
+      description: string;
+      total: number;
+      count: number;
+      types: Set<ExpenseType>;
+    }
+  >();
   expensesSnap.forEach((doc) => {
     const expense = doc.data() as Expense;
-    totalExpenses += expense.amount ?? 0;
+    const amount = expense.amount ?? 0;
+    totalExpenses += amount;
+
+    const type = (expense.type ?? "other") as ExpenseType;
+    const typeEntry = expenseTypeMap.get(type) ?? { total: 0, count: 0 };
+    typeEntry.total += amount;
+    typeEntry.count += 1;
+    expenseTypeMap.set(type, typeEntry);
+
+    // Group by a normalized description so "Hickory dowels" and
+    // "hickory  dowels" fold together; the first-seen spelling is displayed.
+    const trimmed = (expense.description ?? "").trim();
+    const description = trimmed.length > 0 ? trimmed : "(no description)";
+    const key = description.toLowerCase().replace(/\s+/g, " ");
+    const descEntry = expenseDescMap.get(key) ?? {
+      description,
+      total: 0,
+      count: 0,
+      types: new Set<ExpenseType>(),
+    };
+    descEntry.total += amount;
+    descEntry.count += 1;
+    descEntry.types.add(type);
+    expenseDescMap.set(key, descEntry);
   });
+  // Normalize after float accumulation so cents are exact.
+  totalExpenses = Math.round(totalExpenses * 100) / 100;
+
+  const expensesByType: ExpenseTypeBreakdown[] = [...expenseTypeMap.entries()]
+    .map(([type, v]) => ({
+      type,
+      total: Math.round(v.total * 100) / 100,
+      count: v.count,
+      share: totalExpenses > 0 ? v.total / totalExpenses : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const expensesByDescription: ExpenseDescriptionBreakdown[] = [
+    ...expenseDescMap.values(),
+  ]
+    .map((v) => ({
+      description: v.description,
+      types: [...v.types].sort(),
+      total: Math.round(v.total * 100) / 100,
+      count: v.count,
+      share: totalExpenses > 0 ? v.total / totalExpenses : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
 
   const productPerformance = [...productMap.values()].sort(
     (a, b) => b.revenue - a.revenue,
@@ -271,6 +350,8 @@ async function buildAnalytics(range: DateRange): Promise<AnalyticsResponse> {
     customers,
     topCustomers,
     lowStock,
+    expensesByType,
+    expensesByDescription,
   };
 }
 
@@ -325,6 +406,8 @@ export const adminAnalytics = onRequest(
 // src/lib/admin/analytics-types.ts which mirrors the shape).
 export type {
   AnalyticsResponse,
+  ExpenseTypeBreakdown,
+  ExpenseDescriptionBreakdown,
   CustomerAggregate,
   ProductPerformance,
   LowStockItem,

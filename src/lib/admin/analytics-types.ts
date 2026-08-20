@@ -1,6 +1,8 @@
 /**
  * Mirror of functions/src/adminAnalytics.ts response shape. Keep in sync.
  */
+import type { ExpenseType } from "./expenses-types";
+
 export interface PaymentBreakdown {
   cash: number;
   card: number;
@@ -50,6 +52,23 @@ export interface AnalyticsKpis {
   profitMargin: number;
 }
 
+export interface ExpenseTypeBreakdown {
+  type: ExpenseType;
+  total: number;
+  count: number;
+  /** Fraction of totalExpenses in range (0..1). */
+  share: number;
+}
+
+export interface ExpenseDescriptionBreakdown {
+  description: string;
+  /** Every expense type this description was filed under, sorted. */
+  types: ExpenseType[];
+  total: number;
+  count: number;
+  share: number;
+}
+
 export interface AnalyticsResponse {
   range: { from: string | null; to: string | null };
   kpis: AnalyticsKpis;
@@ -60,6 +79,8 @@ export interface AnalyticsResponse {
   customers: CustomerAggregate[];
   topCustomers: CustomerAggregate[];
   lowStock: LowStockItem[];
+  expensesByType: ExpenseTypeBreakdown[];
+  expensesByDescription: ExpenseDescriptionBreakdown[];
 }
 
 export interface AnalyticsQuery {

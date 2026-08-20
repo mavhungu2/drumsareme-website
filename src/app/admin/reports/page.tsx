@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { AdminApiError, getAnalytics } from "@/lib/admin/api-client";
 import type { AnalyticsResponse } from "@/lib/admin/analytics-types";
+import { EXPENSE_TYPE_LABEL } from "@/lib/admin/expenses-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
 import { formatZar } from "@/lib/admin/format";
 import KpiCard from "@/components/admin/KpiCard";
@@ -68,6 +69,11 @@ export default function AdminReportsPage() {
     [data],
   );
   const topCustomers = useMemo(() => data?.topCustomers ?? [], [data]);
+  const expensesByType = useMemo(() => data?.expensesByType ?? [], [data]);
+  const expensesByDescription = useMemo(
+    () => data?.expensesByDescription ?? [],
+    [data],
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -77,7 +83,8 @@ export default function AdminReportsPage() {
             Reports
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Revenue, profit, and product performance for the selected range.
+            Revenue, profit, expenses, and product performance for the selected
+            range.
           </p>
         </div>
         <button
@@ -210,6 +217,108 @@ export default function AdminReportsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-background p-5 sm:p-6 space-y-4">
+        <header className="flex items-baseline justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Expenses by type
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              Sorted by amount in selected range.
+            </p>
+          </div>
+          <p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+            {formatZar(data?.kpis.totalExpenses ?? 0)}
+          </p>
+        </header>
+        {expensesByType.length === 0 ? (
+          <p className="text-sm text-muted">No expenses in this range.</p>
+        ) : (
+          <ul className="space-y-3">
+            {expensesByType.map((row) => (
+              <li key={row.type} className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-foreground">
+                    {EXPENSE_TYPE_LABEL[row.type] ?? row.type}
+                    <span className="ml-2 text-xs text-muted">
+                      {row.count} {row.count === 1 ? "entry" : "entries"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    <span className="font-semibold text-foreground">
+                      {formatZar(row.total)}
+                    </span>
+                    <span className="ml-2 text-xs text-muted">
+                      {formatPercent(row.share)}
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-surface">
+                  <div
+                    className="h-full rounded-full bg-foreground/70"
+                    style={{ width: `${Math.max(row.share * 100, 1.5)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-background p-5 sm:p-6 space-y-4">
+        <header>
+          <h2 className="text-base font-semibold text-foreground">
+            Expenses by description
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            Entries sharing a description are grouped. Sorted by amount.
+          </p>
+        </header>
+        {expensesByDescription.length === 0 ? (
+          <p className="text-sm text-muted">No expenses in this range.</p>
+        ) : (
+          <div className="overflow-hidden border border-border rounded-xl">
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-left">
+                <thead className="sticky top-0 bg-surface text-xs uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Description</th>
+                    <th className="px-4 py-2 font-medium">Type</th>
+                    <th className="px-4 py-2 font-medium text-right">
+                      Entries
+                    </th>
+                    <th className="px-4 py-2 font-medium text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {expensesByDescription.map((row, index) => (
+                    <tr key={`${row.description}-${index}`}>
+                      <td className="px-4 py-2 align-middle text-sm text-foreground">
+                        {row.description}
+                      </td>
+                      <td className="px-4 py-2 align-middle text-xs text-muted">
+                        {row.types
+                          .map((t) => EXPENSE_TYPE_LABEL[t] ?? t)
+                          .join(", ")}
+                      </td>
+                      <td className="px-4 py-2 align-middle text-right text-sm tabular-nums">
+                        {row.count}
+                      </td>
+                      <td className="px-4 py-2 align-middle text-right text-sm font-semibold tabular-nums">
+                        {formatZar(row.total)}
+                        <span className="ml-2 text-xs font-normal text-muted">
+                          {formatPercent(row.share)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>
