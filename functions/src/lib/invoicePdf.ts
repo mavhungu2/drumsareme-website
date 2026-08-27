@@ -16,6 +16,9 @@ import { discountLabel } from "./discount";
 const LOGO_URL =
   "https://drumsareme.co.za/images/logos/logo-black-trimmed.png";
 
+// DUPLICATED (deliberately) from src/lib/admin/business-info.ts — the two
+// TypeScript projects cannot import from each other. That copy renders the
+// HTML invoice page; this one renders the emailed PDF. CHANGE BOTH TOGETHER.
 const BUSINESS = {
   name: "DrumsAreMe",
   tagline: "Premium American Hickory Drumsticks",
@@ -23,8 +26,8 @@ const BUSINESS = {
   website: "drumsareme.co.za",
   banking: {
     bank: "Capitec",
-    accountName: "DRUMSAREME - NG MPHARALALA",
-    accountNumber: "2515581117",
+    accountName: "DRUMSAREME AUDIO PTY LTD",
+    accountNumber: "1055755233",
     branchCode: "470010",
     referenceHint: "Use the invoice number as the payment reference",
   },
