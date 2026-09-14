@@ -38,6 +38,24 @@
     "sortOrder": 1
   },
   {
+    "id": "ex5a-ninetreasures",
+    "slug": "ex5a-ninetreasures",
+    "name": "Keep Time EX5A - 9 Treasures",
+    "size": "EX5A",
+    "color": "Red",
+    "price": 150,
+    "description": "The new variant of the EX5A with a touch of red but still as durable and great premium-drumstick feel on the hands.",
+    "features": [
+      "American Hickory wood",
+      "Red finish",
+      "Extended reach design",
+      "Smooth lacquer finish"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/ex5a-ninetreasures/1787832058000.jpg",
+    "inStock": true,
+    "sortOrder": 1
+  },
+  {
     "id": "7a-green",
     "slug": "7a-green",
     "name": "Keep Time 7A - Green",
@@ -92,6 +110,24 @@
       "Smooth lacquer finish"
     ],
     "image": "/images/gallery/20260110_170349.jpg",
+    "inStock": true,
+    "sortOrder": 4
+  },
+  {
+    "id": "ex7a-natural",
+    "slug": "ex7a-natural",
+    "name": "Keep Time EX7A - Natural",
+    "size": "EX7A",
+    "color": "Natural",
+    "price": 150,
+    "description": "The 7a with just a longer extended feel and a ball tip.",
+    "features": [
+      "American Hickory wood",
+      "Ball tip",
+      "Extended reach design",
+      "Smooth lacquer finish"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/ex7a-natural/1787832058000.jpg",
     "inStock": true,
     "sortOrder": 4
   },
@@ -334,5 +370,43 @@
     "image": "/images/gallery/20260110_170154.jpg",
     "inStock": true,
     "sortOrder": 14
+  },
+  {
+    "id": "85a-natural",
+    "slug": "85a-natural",
+    "name": "Keep Time - 85A",
+    "size": "85A",
+    "color": "Natural",
+    "price": 150,
+    "description": "85A drumsticks are a versatile drumstick size that combines the characteristics of a 7A and a 5A drumstick, making them slightly slimmer and lighter than a standard 5A while still providing excellent control and durability. They are often referred to as a \"diet 5A\" because they offer a lighter touch without sacrificing balance",
+    "features": [
+      "Diameter: 0.55\" (1.4 cm)",
+      "Length: 16\" (40.64 cm)",
+      "Feel: Lightweight, well-balanced, and responsive",
+      "Tip Shape: Teardrop-shaped, providing clear cymbal articulation and warm drum tones",
+      "Material: hickory, known for its durability and shock absorption"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/85a-natural/1789407390103.jpg",
+    "inStock": true,
+    "sortOrder": 15
+  },
+  {
+    "id": "55a-natural",
+    "slug": "55a-natural",
+    "name": "Keep Time - 55A",
+    "size": "55A",
+    "color": "Natural",
+    "price": 150,
+    "description": "A 55A drumstick is essentially a hybrid between a 5A and 5B drumstick. It is designed for drummers who find a 5A too light but a 5B too heavy.",
+    "features": [
+      "Diameter: 0.580\"",
+      "Length: 16\" to 16.5\"",
+      "Weight: Medium-heavy",
+      "Feel: More substantial in the hands than a 5A, with added power and durability",
+      "Applications: Rock, pop, gospel, contemporary worship, funk, and heavier styles that require more volume and projection"
+    ],
+    "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/55a-natural/1789407974770.jpg",
+    "inStock": true,
+    "sortOrder": 17
   }
 ]
