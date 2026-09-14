@@ -14,3 +14,4 @@ export { validatePromo } from "./validatePromo";
 export { adminProducts } from "./adminProducts";
 export { adminUploadProductImage } from "./adminUploadProductImage";
 export { productsAutoRedeploy } from "./productsAutoRedeploy";
+export { inventoryAutoRedeploy } from "./inventoryAutoRedeploy";

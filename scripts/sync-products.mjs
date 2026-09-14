@@ -1,11 +1,20 @@
 #!/usr/bin/env node
 /**
- * Build-time bake: fetches every product from Firestore (public read) and
- * writes them to src/lib/products.generated.json so the static export and
- * generateStaticParams have a synchronous source.
+ * Build-time bake: fetches every product from Firestore (public read) that
+ * has a matching inventory/{productId} row and writes them to
+ * src/lib/products.generated.json so the static export and
+ * generateStaticParams have a synchronous source. A product with no
+ * inventory row is excluded entirely — with no stock row there is no
+ * quantity cap, and checkout lets untracked products through with no limit,
+ * so baking it in would allow unlimited overselling. A row with
+ * currentStock 0 is still baked; it just shows as sold out, since only
+ * existence of the row is checked here.
  *
  * Runs as a prebuild step. The site also overlays live price/inStock from
  * Firestore on hydration so admin edits between builds are reflected.
+ *
+ * Fails open: if the inventory fetch errors or comes back empty, every
+ * product is baked unfiltered rather than risk emptying the shop.
  *
  * Usage: node scripts/sync-products.mjs
  */
@@ -34,7 +43,7 @@ async function main() {
   const db = getFirestore(app);
   const snap = await getDocs(collection(db, "products"));
 
-  const products = snap.docs
+  const allProducts = snap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -53,6 +62,43 @@ async function main() {
       };
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // A product only belongs in the shop once it has a stock row. Fetch
+  // inventory and use it as a gate: inventoryIds stays null (meaning "don't
+  // filter") whenever the fetch fails or comes back empty, so a transient
+  // Firestore error can never silently empty the shop.
+  let inventoryIds;
+  try {
+    const inventorySnap = await getDocs(collection(db, "inventory"));
+    inventoryIds = new Set(inventorySnap.docs.map((doc) => doc.id));
+    if (inventoryIds.size === 0) {
+      console.warn(
+        "Inventory collection returned 0 documents — baking all products unfiltered.",
+      );
+      inventoryIds = null;
+    }
+  } catch (err) {
+    console.warn(
+      "Failed to fetch inventory — baking all products unfiltered:",
+      err,
+    );
+    inventoryIds = null;
+  }
+
+  let products = allProducts;
+  if (inventoryIds) {
+    products = allProducts.filter((product) => inventoryIds.has(product.id));
+    const skipped = allProducts.filter(
+      (product) => !inventoryIds.has(product.id),
+    );
+    if (skipped.length > 0) {
+      console.log(
+        `Skipped ${skipped.length} product${skipped.length === 1 ? "" : "s"} with no inventory row: ${skipped
+          .map((product) => product.id)
+          .join(", ")}`,
+      );
+    }
+  }
 
   // Defensive: never wipe the existing catalog if the fetch returned nothing.
   // A 0-product write would empty generateStaticParams and break the build.
