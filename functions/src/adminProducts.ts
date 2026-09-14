@@ -10,6 +10,7 @@ import {
 import { ADMIN_EMAILS, requireAdmin, type AdminIdentity } from "./lib/auth";
 import { applyCors } from "./lib/cors";
 import { invalidateProductCache } from "./lib/products";
+import { reorderProducts, type OrderedProduct } from "./lib/productOrder";
 
 const ROOT_PATH = "/api/admin/products";
 const MAX_NAME_LEN = 200;
@@ -295,21 +296,49 @@ async function createProduct(
   }
   const { fields } = validated;
   const id = fields.slug as string;
+  const position = fields.sortOrder as number;
 
-  const docRef = db.collection("products").doc(id);
+  const productsCol = db.collection("products");
+  const docRef = productsCol.doc(id);
   try {
-    await docRef.create({
-      slug: fields.slug,
-      name: fields.name,
-      size: fields.size,
-      color: fields.color,
-      price: fields.price,
-      description: fields.description,
-      features: fields.features,
-      image: fields.image,
-      inStock: fields.inStock,
-      sortOrder: fields.sortOrder,
-      updatedAt: FieldValue.serverTimestamp(),
+    await db.runTransaction(async (tx) => {
+      // Insert at `position` among the CURRENT products, then only shift
+      // the ones that actually move. Every write here fires the
+      // productsAutoRedeploy trigger, so adding one product must not
+      // rewrite the whole catalog.
+      const existingSnap = await tx.get(productsCol);
+      const current: OrderedProduct[] = existingSnap.docs.map((doc) => ({
+        id: doc.id,
+        sortOrder: (doc.data() as Product).sortOrder,
+      }));
+      const finalOrder = reorderProducts(current, position, {
+        insertingId: id,
+      });
+      const currentById = new Map(current.map((p) => [p.id, p.sortOrder]));
+      for (const p of finalOrder) {
+        if (p.id === id || currentById.get(p.id) === p.sortOrder) continue;
+        tx.update(productsCol.doc(p.id), {
+          sortOrder: p.sortOrder,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      // tx.create fails the whole transaction — including the shifts above
+      // — if the slug is already taken, same as the plain create() this
+      // replaces.
+      tx.create(docRef, {
+        slug: fields.slug,
+        name: fields.name,
+        size: fields.size,
+        color: fields.color,
+        price: fields.price,
+        description: fields.description,
+        features: fields.features,
+        image: fields.image,
+        inStock: fields.inStock,
+        sortOrder: finalOrder.find((p) => p.id === id)!.sortOrder,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     });
   } catch (err) {
     const code = (err as { code?: unknown }).code;
@@ -363,14 +392,51 @@ async function patchProduct(
   }
   delete (updates as { slug?: unknown }).slug;
 
-  const docRef = db.collection("products").doc(id);
+  const productsCol = db.collection("products");
+  const docRef = productsCol.doc(id);
   const snap = await docRef.get();
   if (!snap.exists) {
     res.status(404).json({ error: "Not found" });
     return;
   }
 
-  await docRef.update(updates);
+  const requestedPosition = validated.fields.sortOrder;
+  if (requestedPosition === undefined) {
+    // sortOrder isn't part of this patch: leave every other product alone.
+    await docRef.update(updates);
+  } else {
+    await db.runTransaction(async (tx) => {
+      // Move within the CURRENT products, then only shift the ones that
+      // actually move. Every write here fires the productsAutoRedeploy
+      // trigger, so re-saving a product at its own position (or patching
+      // an unrelated field) must not touch the other products.
+      const existingSnap = await tx.get(productsCol);
+      const current: OrderedProduct[] = existingSnap.docs.map((doc) => ({
+        id: doc.id,
+        sortOrder: (doc.data() as Product).sortOrder,
+      }));
+      const finalOrder = reorderProducts(current, requestedPosition, {
+        movingId: id,
+      });
+      const currentById = new Map(current.map((p) => [p.id, p.sortOrder]));
+      for (const p of finalOrder) {
+        // The moving product itself is folded into `updates` below — a
+        // transaction can only write a given document once.
+        if (p.id === id || currentById.get(p.id) === p.sortOrder) continue;
+        tx.update(productsCol.doc(p.id), {
+          sortOrder: p.sortOrder,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      // Always take the clamped final position, not the raw request — an
+      // out-of-range value (e.g. 9999) means "move to the end", and a
+      // same-position move must re-save the product's existing value
+      // rather than whatever was sent.
+      updates.sortOrder = finalOrder.find((p) => p.id === id)!.sortOrder;
+      tx.update(docRef, updates);
+    });
+  }
+
   invalidateProductCache();
 
   const saved = await docRef.get();
