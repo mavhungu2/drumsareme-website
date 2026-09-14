@@ -178,7 +178,11 @@ async function upsertInventory(
     };
     if (input.supplier !== undefined) {
       updates.supplier = input.supplier;
-    } else if (!snap.exists) {
+    } else if (snap.exists) {
+      // Blank supplier on an existing doc: clear the stored value. FieldValue.delete()
+      // is only valid inside update() / set({merge: true}) — never in the plain set()
+      // used below for brand-new docs, so when there's no existing doc we simply omit
+      // the field instead of trying to "delete" something that was never written.
       updates.supplier = FieldValue.delete();
     }
     if (snap.exists) {
