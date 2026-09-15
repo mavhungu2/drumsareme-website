@@ -12,7 +12,7 @@ interface ProductTableProps {
   onDelete: (product: ProductListItem) => void;
 }
 
-type StatusKind = "hidden" | "out" | "low" | "in_stock" | "in_stock_untracked";
+type StatusKind = "hidden" | "out" | "low" | "in_stock" | "unpublished";
 
 interface StatusInfo {
   kind: StatusKind;
@@ -31,9 +31,9 @@ function deriveStatus(item: ProductListItem): StatusInfo {
   }
   if (!item.inventory) {
     return {
-      kind: "in_stock_untracked",
-      label: "In stock",
-      className: "border-green/30 bg-green-light/20 text-green",
+      kind: "unpublished",
+      label: "Not published",
+      className: "border-amber-300 bg-amber-50 text-amber-800",
     };
   }
   const { currentStock, lowStock } = item.inventory;
@@ -135,12 +135,14 @@ export default function ProductTable({
                             ? "Listed in catalog but inventory is depleted. Customers see a Sold out badge."
                             : status.kind === "low"
                               ? "Stock is at or below the reorder level."
-                              : status.kind === "in_stock_untracked"
-                                ? "Listed in catalog. No inventory row yet — set opening stock on the Inventory page."
+                              : status.kind === "unpublished"
+                                ? "No inventory row, so this product is left out of the shop entirely. Add it on the Inventory page to publish it."
                                 : "Listed in catalog with stock available."
                       }
                     >
-                      {(status.kind === "low" || status.kind === "out") && (
+                      {(status.kind === "low" ||
+                        status.kind === "out" ||
+                        status.kind === "unpublished") && (
                         <AlertTriangle size={12} aria-hidden />
                       )}
                       {status.label}
