@@ -19,21 +19,21 @@
     "sortOrder": 0
   },
   {
-    "id": "7a-blue",
-    "slug": "7a-blue",
-    "name": "Keep Time 7A - Blue",
+    "id": "7a-green",
+    "slug": "7a-green",
+    "name": "Keep Time 7A - Green",
     "size": "7A",
-    "color": "Blue",
+    "color": "Green",
     "price": 150,
-    "description": "The 7A in our signature blue finish. Light, fast, and bold on stage.",
+    "description": "The 7A in vivid green. Stand out behind the kit while keeping the quick, light 7A feel.",
     "features": [
       "American Hickory wood",
-      "Vibrant blue finish",
+      "Vivid green finish",
       "Oval wood tip",
       "Light, fast profile",
       "Smooth grip coating"
     ],
-    "image": "/images/gallery/IMG_7494.jpg",
+    "image": "/images/gallery/IMG_7491.jpg",
     "inStock": true,
     "sortOrder": 1
   },
@@ -53,43 +53,24 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/ex5a-ninetreasures/1787832058000.jpg",
     "inStock": true,
-    "sortOrder": 1
-  },
-  {
-    "id": "7a-green",
-    "slug": "7a-green",
-    "name": "Keep Time 7A - Green",
-    "size": "7A",
-    "color": "Green",
-    "price": 150,
-    "description": "The 7A in vivid green. Stand out behind the kit while keeping the quick, light 7A feel.",
-    "features": [
-      "American Hickory wood",
-      "Vivid green finish",
-      "Oval wood tip",
-      "Light, fast profile",
-      "Smooth grip coating"
-    ],
-    "image": "/images/gallery/IMG_7491.jpg",
-    "inStock": true,
     "sortOrder": 2
   },
   {
-    "id": "7a-red",
-    "slug": "7a-red",
-    "name": "Keep Time 7A - Red",
+    "id": "7a-blue",
+    "slug": "7a-blue",
+    "name": "Keep Time 7A - Blue",
     "size": "7A",
-    "color": "Red",
+    "color": "Blue",
     "price": 150,
-    "description": "The 7A in striking red. Light, fast response with a finish that commands attention.",
+    "description": "The 7A in our signature blue finish. Light, fast, and bold on stage.",
     "features": [
       "American Hickory wood",
-      "Striking red finish",
+      "Vibrant blue finish",
       "Oval wood tip",
       "Light, fast profile",
       "Smooth grip coating"
     ],
-    "image": "/images/gallery/7a-red.jpg",
+    "image": "/images/gallery/IMG_7494.jpg",
     "inStock": true,
     "sortOrder": 3
   },
@@ -129,7 +110,7 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/ex7a-natural/1787832058000.jpg",
     "inStock": true,
-    "sortOrder": 4
+    "sortOrder": 5
   },
   {
     "id": "5a-black",
@@ -149,7 +130,7 @@
     ],
     "image": "/images/gallery/20260110_165902.jpg",
     "inStock": true,
-    "sortOrder": 5
+    "sortOrder": 6
   },
   {
     "id": "5a-pink",
@@ -169,7 +150,7 @@
     ],
     "image": "/images/gallery/20260110_165943.jpg",
     "inStock": true,
-    "sortOrder": 6
+    "sortOrder": 7
   },
   {
     "id": "5a-blue",
@@ -189,7 +170,7 @@
     ],
     "image": "/images/gallery/20260110_165835.jpg",
     "inStock": true,
-    "sortOrder": 7
+    "sortOrder": 8
   },
   {
     "id": "5a-yellow",
@@ -209,7 +190,7 @@
     ],
     "image": "/images/gallery/20260110_165720.jpg",
     "inStock": true,
-    "sortOrder": 8
+    "sortOrder": 9
   },
   {
     "id": "5a-silver-blade",
@@ -229,7 +210,7 @@
     ],
     "image": "/images/gallery/5a-silver-blade.jpg",
     "inStock": true,
-    "sortOrder": 9
+    "sortOrder": 10
   },
   {
     "id": "5b-natural",
@@ -249,7 +230,7 @@
     ],
     "image": "/images/gallery/20260110_170118.jpg",
     "inStock": true,
-    "sortOrder": 10
+    "sortOrder": 11
   },
   {
     "id": "5b-black",
@@ -269,7 +250,7 @@
     ],
     "image": "/images/gallery/IMG_7487.jpg",
     "inStock": true,
-    "sortOrder": 11
+    "sortOrder": 12
   },
   {
     "id": "5a-green",
@@ -289,7 +270,7 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/5a-green/1780080990280.jpg",
     "inStock": true,
-    "sortOrder": 12
+    "sortOrder": 13
   },
   {
     "id": "ex5a-natural",
@@ -309,7 +290,7 @@
     ],
     "image": "/images/gallery/20260110_170225.jpg",
     "inStock": true,
-    "sortOrder": 12
+    "sortOrder": 14
   },
   {
     "id": "5a-red",
@@ -329,7 +310,7 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/5a-red/1777575194452.jpg",
     "inStock": true,
-    "sortOrder": 13
+    "sortOrder": 15
   },
   {
     "id": "ex5a-black",
@@ -349,7 +330,7 @@
     ],
     "image": "/images/gallery/IMG_7486.jpg",
     "inStock": true,
-    "sortOrder": 13
+    "sortOrder": 16
   },
   {
     "id": "ex5b-natural",
@@ -369,12 +350,12 @@
     ],
     "image": "/images/gallery/20260110_170154.jpg",
     "inStock": true,
-    "sortOrder": 14
+    "sortOrder": 17
   },
   {
     "id": "85a-natural",
     "slug": "85a-natural",
-    "name": "Keep Time - 85A",
+    "name": "Keep Time 85A - Natural",
     "size": "85A",
     "color": "Natural",
     "price": 150,
@@ -388,12 +369,12 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/85a-natural/1789407390103.jpg",
     "inStock": true,
-    "sortOrder": 15
+    "sortOrder": 18
   },
   {
     "id": "55a-natural",
     "slug": "55a-natural",
-    "name": "Keep Time - 55A",
+    "name": "Keep Time 55A - Natural",
     "size": "55A",
     "color": "Natural",
     "price": 150,
@@ -407,6 +388,6 @@
     ],
     "image": "https://storage.googleapis.com/drumsareme-website-uploads/product-images/55a-natural/1789407974770.jpg",
     "inStock": true,
-    "sortOrder": 17
+    "sortOrder": 19
   }
 ]

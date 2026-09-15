@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import {
   AdminApiError,
@@ -12,7 +12,8 @@ import type {
   UpsertInventoryInput,
 } from "@/lib/admin/inventory-types";
 import { useAdminAuth } from "@/lib/admin/auth-context";
-import { products } from "@/lib/products";
+import { products as bakedProducts } from "@/lib/products";
+import { useLiveCatalog } from "@/lib/use-live-products";
 import InventoryTable from "@/components/admin/InventoryTable";
 
 interface MissingProduct {
@@ -20,9 +21,12 @@ interface MissingProduct {
   name: string;
 }
 
-function buildMissing(items: InventoryListItem[]): MissingProduct[] {
+function buildMissing(
+  catalog: ReadonlyArray<{ id: string; name: string }>,
+  items: InventoryListItem[],
+): MissingProduct[] {
   const tracked = new Set(items.map((i) => i.productId));
-  return products
+  return catalog
     .filter((p) => !tracked.has(p.id))
     .map((p) => ({ productId: p.id, name: p.name }));
 }
@@ -103,7 +107,12 @@ export default function AdminInventoryPage() {
     [refresh],
   );
 
-  const missing = buildMissing(items);
+  // The baked catalog omits every product without an inventory row (see
+  // scripts/sync-products.mjs), which is exactly the set this list exists to
+  // offer. Reading it directly deadlocks: no row -> not baked -> no Add button
+  // -> no row. useLiveCatalog merges in the Firestore-only products.
+  const catalog = useLiveCatalog(bakedProducts);
+  const missing = useMemo(() => buildMissing(catalog, items), [catalog, items]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
