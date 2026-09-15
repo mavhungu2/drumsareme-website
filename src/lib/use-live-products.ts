@@ -18,6 +18,7 @@ interface LiveOverlayEntry {
   size?: string;
   color?: string;
   sortOrder?: number;
+  category?: string;
 }
 
 type LiveOverlay = ReadonlyMap<string, LiveOverlayEntry>;
@@ -71,6 +72,7 @@ async function loadOverlay(): Promise<LiveOverlay> {
           size?: unknown;
           color?: unknown;
           sortOrder?: unknown;
+          category?: unknown;
         };
         const price =
           typeof data.price === "number" && Number.isFinite(data.price)
@@ -100,6 +102,9 @@ async function loadOverlay(): Promise<LiveOverlay> {
         }
         if (typeof data.size === "string") entry.size = data.size;
         if (typeof data.color === "string") entry.color = data.color;
+        if (typeof data.category === "string" && data.category.length > 0) {
+          entry.category = data.category;
+        }
         if (
           typeof data.sortOrder === "number" &&
           Number.isFinite(data.sortOrder)
@@ -150,6 +155,7 @@ function applyOverlay(
     description: live.description ?? product.description,
     features: live.features ?? product.features,
     image: live.image ?? product.image,
+    category: live.category ?? product.category,
   };
 }
 
@@ -199,23 +205,21 @@ export function useLiveCatalog(
     }
     overlay.forEach((entry, id) => {
       if (seen.has(id)) return;
-      // Firestore-only product (admin added it after the last build). Need
-      // every Product field; if any is missing we skip rather than render a
-      // half-broken row.
-      if (
-        !entry.slug ||
-        !entry.name ||
-        entry.size === undefined ||
-        entry.color === undefined
-      ) {
+      // Firestore-only product (admin added it after the last build). Identity
+      // is non-negotiable, so a row missing slug or name is still skipped —
+      // but size and colour are not universal: categories that declare no spec
+      // pills store them blank, and skipping on that would make new audio gear
+      // vanish from the admin pickers entirely.
+      if (!entry.slug || !entry.name) {
         return;
       }
       result.push({
         id,
         slug: entry.slug,
         name: entry.name,
-        size: entry.size,
-        color: entry.color,
+        size: entry.size ?? "",
+        color: entry.color ?? "",
+        category: entry.category,
         price: entry.price,
         description: entry.description ?? "",
         features: entry.features ?? [],

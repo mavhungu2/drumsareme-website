@@ -3,6 +3,8 @@
 import { AlertTriangle, Loader2, Pencil, Trash2 } from "lucide-react";
 import type { ProductListItem } from "@/lib/admin/products-types";
 import { formatDateTime, formatZar } from "@/lib/admin/format";
+import { categoryOf } from "@/lib/product-categories";
+import { specFieldsOf } from "@/components/product/SpecPills";
 
 interface ProductTableProps {
   items: ProductListItem[];
@@ -112,7 +114,10 @@ export default function ProductTable({
                     {item.name}
                   </span>
                   <span className="text-xs text-muted">
-                    {item.size} · {item.color}
+                    {[
+                      categoryOf(item).label,
+                      ...specFieldsOf(item).map((field) => item[field]),
+                    ].join(" · ")}
                   </span>
                 </div>
               </td>

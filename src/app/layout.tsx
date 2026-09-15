@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s | #DrumsAreMe",
   },
   description:
-    "Premium American Hickory drumsticks by Keep Time Studio. Available in 5A, 5B, EX5A, EX5B sizes. Natural, Black, and Pink finishes. R150 per pair. South Africa.",
+    "Premium American Hickory drumsticks by Keep Time Studio, from R150 per pair — 5A, 5B, EX5A, EX5B in Natural, Black, Pink. Plus audio interfaces. South Africa.",
   keywords: [
     "drumsticks",
     "drums",
@@ -34,6 +34,7 @@ export const metadata: Metadata = {
     "5A",
     "5B",
     "drumsticks sale",
+    "audio interface",
   ],
   openGraph: {
     url: siteUrl,

@@ -4,6 +4,11 @@ import { logger } from "firebase-functions";
 import {
   db,
   FieldValue,
+  CATEGORY_REQUIRED_SPECS,
+  DEFAULT_PRODUCT_CATEGORY,
+  PRODUCT_CATEGORY_IDS,
+  isProductCategory,
+  type CategoryId,
   type InventoryItem,
   type Product,
 } from "./lib/firestore";
@@ -25,6 +30,11 @@ interface ProductListItem {
   name: string;
   size: string;
   color: string;
+  /**
+   * Absent only on docs that predate categories and have not been backfilled;
+   * the storefront falls back to the default category for those.
+   */
+  category?: CategoryId;
   price: number;
   description: string;
   features: string[];
@@ -100,6 +110,7 @@ function toListItem(
     name: product.name,
     size: product.size,
     color: product.color,
+    category: product.category,
     price: product.price,
     description: product.description,
     features: product.features,
@@ -134,6 +145,7 @@ interface ValidatedFields {
   name?: string;
   size?: string;
   color?: string;
+  category?: CategoryId;
   price?: number;
   description?: string;
   features?: string[];
@@ -174,6 +186,7 @@ function validateFields(
     name,
     size,
     color,
+    category,
     price,
     description,
     features,
@@ -204,13 +217,49 @@ function validateFields(
   if (!nameCheck.ok) return nameCheck;
   if (nameCheck.value !== undefined) fields.name = nameCheck.value;
 
-  const sizeCheck = validateString(size, "size", 40, !partial);
+  // A closed set, not free text, so it skips validateString: an unknown value
+  // would silently fall back to the default category on the storefront rather
+  // than render as typed, which is worse than a 400 here.
+  if (category !== undefined) {
+    if (!isProductCategory(category)) {
+      return {
+        ok: false,
+        error: `category must be one of: ${PRODUCT_CATEGORY_IDS.join(", ")}`,
+      };
+    }
+    fields.category = category;
+  } else if (!partial) {
+    fields.category = DEFAULT_PRODUCT_CATEGORY;
+  }
+
+  // Which specs are mandatory depends on the category resolved above, so this
+  // has to come after it. A category that declares no spec pills accepts a
+  // blank size/colour rather than forcing filler into the catalog.
+  const requiredSpecs = partial
+    ? []
+    : CATEGORY_REQUIRED_SPECS[
+        (fields.category as CategoryId | undefined) ?? DEFAULT_PRODUCT_CATEGORY
+      ];
+
+  const sizeCheck = validateString(
+    size,
+    "size",
+    40,
+    requiredSpecs.includes("size"),
+  );
   if (!sizeCheck.ok) return sizeCheck;
   if (sizeCheck.value !== undefined) fields.size = sizeCheck.value;
+  else if (!partial) fields.size = "";
 
-  const colorCheck = validateString(color, "color", 40, !partial);
+  const colorCheck = validateString(
+    color,
+    "color",
+    40,
+    requiredSpecs.includes("color"),
+  );
   if (!colorCheck.ok) return colorCheck;
   if (colorCheck.value !== undefined) fields.color = colorCheck.value;
+  else if (!partial) fields.color = "";
 
   if (price !== undefined) {
     if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
@@ -331,6 +380,7 @@ async function createProduct(
         name: fields.name,
         size: fields.size,
         color: fields.color,
+        category: fields.category,
         price: fields.price,
         description: fields.description,
         features: fields.features,

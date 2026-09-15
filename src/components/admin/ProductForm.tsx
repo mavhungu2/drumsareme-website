@@ -13,6 +13,13 @@ import type {
   CreateProductInput,
   ProductListItem,
 } from "@/lib/admin/products-types";
+import {
+  CATEGORIES,
+  DEFAULT_CATEGORY,
+  categoryOf,
+  isCategoryId,
+  type CategoryId,
+} from "@/lib/product-categories";
 
 interface ProductFormProps {
   initial: ProductListItem | null; // null = create
@@ -25,6 +32,7 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 interface FormState {
   slug: string;
   name: string;
+  category: CategoryId;
   size: string;
   color: string;
   price: string;
@@ -40,6 +48,7 @@ function toFormState(item: ProductListItem | null): FormState {
     return {
       slug: "",
       name: "",
+      category: DEFAULT_CATEGORY,
       size: "",
       color: "",
       price: "",
@@ -53,6 +62,9 @@ function toFormState(item: ProductListItem | null): FormState {
   return {
     slug: item.slug,
     name: item.name,
+    // Round-trips the stored value; an absent or unrecognised one normalises
+    // to the default rather than leaving the select blank.
+    category: categoryOf(item).id,
     size: item.size,
     color: item.color,
     price: String(item.price),
@@ -71,6 +83,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const slugId = useId();
   const nameId = useId();
+  const categoryId = useId();
   const sizeId = useId();
   const colorId = useId();
   const priceId = useId();
@@ -156,8 +169,13 @@ export default function ProductForm({
       );
     }
     if (!name) return setError("Name is required.");
-    if (!size) return setError("Size is required.");
-    if (!color) return setError("Color is required.");
+    const requiredSpecs = categoryOf({ category: state.category }).specPills;
+    if (requiredSpecs.includes("size") && !size) {
+      return setError("Size is required.");
+    }
+    if (requiredSpecs.includes("color") && !color) {
+      return setError("Color is required.");
+    }
     if (!Number.isFinite(price) || price < 0) {
       return setError("Price must be a non-negative number.");
     }
@@ -173,6 +191,7 @@ export default function ProductForm({
       const payload: CreateProductInput = {
         slug,
         name,
+        category: state.category,
         size,
         color,
         price,
@@ -186,6 +205,7 @@ export default function ProductForm({
         ? await apiCreateProduct(payload)
         : await apiUpdateProduct(initial!.id, {
             name,
+            category: state.category,
             size,
             color,
             price,
@@ -256,6 +276,31 @@ export default function ProductForm({
             onChange={(e) => update("name", e.target.value)}
             className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
+        </label>
+        <label
+          htmlFor={categoryId}
+          className="flex flex-col gap-1 text-xs font-medium text-muted"
+        >
+          <span>Category (drives pricing unit, spec pills and filters)</span>
+          <select
+            id={categoryId}
+            value={state.category}
+            onChange={(e) =>
+              update(
+                "category",
+                isCategoryId(e.target.value)
+                  ? e.target.value
+                  : DEFAULT_CATEGORY,
+              )
+            }
+            className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {CATEGORIES.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label
           htmlFor={sizeId}

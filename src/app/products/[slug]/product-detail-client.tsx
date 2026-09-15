@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { ArrowLeft, Minus, Plus, ShoppingCart, Check } from "lucide-react";
 import { products, getProduct, type Product } from "@/lib/products";
+import { categoryOf } from "@/lib/product-categories";
+import SpecPills from "@/components/product/SpecPills";
 import {
   useLiveOverlay,
   useLiveProduct,
@@ -71,9 +73,20 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     );
   }
 
-  const sameSize = products.filter(
-    (p) => p.size === product.size && p.id !== product.id
+  const category = categoryOf(product);
+  // Related products stay inside the category, grouped by its leading spec
+  // when it has one — "Also available in 5A" for sticks, a plain list for
+  // anything whose specs aren't a grouping (an interface has no size).
+  const [groupBy] = category.specPills;
+  const related = products.filter(
+    (p) =>
+      p.id !== product.id &&
+      categoryOf(p).id === category.id &&
+      (groupBy === undefined || p[groupBy] === product[groupBy])
   );
+  const relatedHeading = groupBy
+    ? `Also available in ${product[groupBy]}`
+    : `More ${category.pluralNoun}`;
 
   const handleAdd = () => {
     if (soldOut || maxAddable <= 0) return;
@@ -108,14 +121,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           </div>
 
           <div className="flex flex-col justify-center">
-            <div className="flex gap-2 mb-4">
-              <span className="bg-surface text-xs font-semibold px-3 py-1 rounded-full">
-                {product.size}
-              </span>
-              <span className="bg-surface text-xs font-medium px-3 py-1 rounded-full text-muted">
-                {product.color}
-              </span>
-            </div>
+            <SpecPills
+              product={product}
+              className="flex gap-2 mb-4"
+              pillClassName="bg-surface text-xs px-3 py-1 rounded-full"
+            />
 
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
               {product.name}
@@ -123,7 +133,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
             <div className="flex items-baseline gap-3 mb-2">
               <span className="text-2xl font-bold">R{product.price}</span>
-              <span className="text-sm text-muted">per pair</span>
+              {category.unitLabel ? (
+                <span className="text-sm text-muted">{category.unitLabel}</span>
+              ) : null}
             </div>
             <div className="mb-6">
               {stock === undefined ? null : stock <= 0 ? (
@@ -213,13 +225,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {sameSize.length > 0 && (
+        {related.length > 0 && (
           <div className="mt-20">
-            <h2 className="text-xl font-bold mb-6">
-              Also available in {product.size}
-            </h2>
+            <h2 className="text-xl font-bold mb-6">{relatedHeading}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-              {sameSize.map((p) => {
+              {related.map((p) => {
                 const justAdded = quickAddedId === p.id;
                 const pStock = overlay.get(p.id)?.stock;
                 const pSoldOut = pStock !== undefined && pStock <= 0;

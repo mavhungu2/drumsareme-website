@@ -27,6 +27,14 @@ import { getFirestore, collection, getDocs } from "firebase/firestore";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/**
+ * Mirrors DEFAULT_CATEGORY in src/lib/product-categories.ts. Products written
+ * before categories existed are drumsticks — that was the whole catalog. Baked
+ * explicitly so the storefront never has to guess, and so a doc that somehow
+ * loses the field still renders as it always did.
+ */
+const DEFAULT_CATEGORY = "drumsticks";
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDjtz_1ngepcvqphxtWzAtd0mLmCwlwXc0",
   authDomain: "drumsareme-website.firebaseapp.com",
@@ -52,6 +60,10 @@ async function main() {
         name: data.name,
         size: data.size,
         color: data.color,
+        category:
+          typeof data.category === "string" && data.category
+            ? data.category
+            : DEFAULT_CATEGORY,
         price: data.price,
         description: data.description,
         features: Array.isArray(data.features) ? data.features : [],

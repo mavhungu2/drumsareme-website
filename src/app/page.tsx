@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Star, Truck, Shield, Package } from "lucide-react";
+import { getProduct } from "@/lib/products";
 
 const featuredProducts = [
   {
@@ -100,7 +101,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { icon: Package, label: "R150 Per Pair" },
+              { icon: Package, label: "Drumsticks from R150" },
               { icon: Truck, label: "Nationwide Delivery" },
               { icon: Shield, label: "Quality Guaranteed" },
               { icon: Star, label: "5-Star Reviews" },
@@ -138,29 +139,36 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {featuredProducts.map((product) => (
-              <Link
-                key={product.slug}
-                href={`/products/${product.slug}`}
-                className="group"
-              >
-                <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-4">
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full">
-                    {product.tag}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-sm sm:text-base">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-muted">R150</p>
-              </Link>
-            ))}
+            {featuredProducts.map((product) => {
+              // Price comes from the catalog so the card can't drift from what
+              // the product page charges (the Silver Blade is not R150).
+              const price = getProduct(product.slug)?.price;
+              return (
+                <Link
+                  key={product.slug}
+                  href={`/products/${product.slug}`}
+                  className="group"
+                >
+                  <div className="relative aspect-[3/4] bg-surface rounded-2xl overflow-hidden mb-4">
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full">
+                      {product.tag}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-sm sm:text-base">
+                    {product.name}
+                  </h3>
+                  {price === undefined ? null : (
+                    <p className="text-sm text-muted">R{price}</p>
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="sm:hidden mt-8 text-center">

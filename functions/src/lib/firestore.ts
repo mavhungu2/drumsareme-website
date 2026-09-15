@@ -149,12 +149,68 @@ export interface InventoryItem {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
+/**
+ * Product category ids, mirroring `CategoryId` in
+ * `src/lib/product-categories.ts` — the storefront module that owns how each
+ * category is priced, labelled and filtered.
+ *
+ * It is a deliberate copy, not an import: `functions/` compiles under its own
+ * tsconfig with `rootDir: "src"`, so reaching into the Next.js app fails with
+ * TS6059. Only the ids are duplicated; the presentation rules stay in the one
+ * place that renders them.
+ *
+ * This list is the write-side gate — `adminProducts` refuses any other value —
+ * so a category added to the storefront but not added here cannot be saved,
+ * and the mismatch surfaces as a 400 naming the accepted values.
+ */
+export const PRODUCT_CATEGORY_IDS = ["drumsticks", "audio-interfaces"] as const;
+
+export type CategoryId = (typeof PRODUCT_CATEGORY_IDS)[number];
+
+/**
+ * Products written before categories existed are drumsticks — that was the
+ * whole catalog. Used as the create-time default and by the backfill script.
+ */
+export const DEFAULT_PRODUCT_CATEGORY: CategoryId = "drumsticks";
+
+/**
+ * Spec fields each category actually requires. Drumsticks are meaningless
+ * without a size and colour; an audio interface has neither, so forcing the
+ * admin to invent them would put filler into the catalog.
+ *
+ * Mirrors `specPills` in src/lib/product-categories.ts — the client renders
+ * from that table, the API validates against this one. The two projects have
+ * separate rootDirs so the type cannot be shared; a category added to one and
+ * not the other is rejected on first save with a message naming the accepted
+ * values.
+ */
+export const CATEGORY_REQUIRED_SPECS: Readonly<
+  Record<CategoryId, ReadonlyArray<"size" | "color">>
+> = {
+  drumsticks: ["size", "color"],
+  "audio-interfaces": [],
+};
+
+export function isProductCategory(value: unknown): value is CategoryId {
+  return (
+    typeof value === "string" &&
+    (PRODUCT_CATEGORY_IDS as ReadonlyArray<string>).includes(value)
+  );
+}
+
 export interface Product {
   id: string;
   slug: string;
   name: string;
   size: string;
   color: string;
+  /**
+   * Drives storefront presentation — unit label, spec pills, listing filters.
+   * Optional because docs written before categories existed carry no value;
+   * readers fall back to DEFAULT_PRODUCT_CATEGORY. `backfillProductCategory`
+   * makes it explicit on the existing catalog.
+   */
+  category?: CategoryId;
   price: number;
   description: string;
   features: string[];

@@ -4,11 +4,42 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { Check, ShoppingCart } from "lucide-react";
-import { products, sizes, colors, type Product } from "@/lib/products";
+import { products, specValues, type Product } from "@/lib/products";
+import {
+  CATEGORIES,
+  categoryById,
+  categoryOf,
+  isCategoryId,
+  type CategoryId,
+  type SpecField,
+} from "@/lib/product-categories";
+import SpecPills from "@/components/product/SpecPills";
 import { useLiveProducts, useLiveOverlay, useStock } from "@/lib/use-live-products";
 import { useCart } from "@/lib/cart-context";
 
 const LOW_STOCK_THRESHOLD = 12;
+
+/** Sentinel for "no filter applied" — never a real category or spec value. */
+const ALL = "all";
+
+type CategorySelection = CategoryId | typeof ALL;
+
+/** Spec fields left out are simply unfiltered. */
+type SpecSelection = Partial<Record<SpecField, string>>;
+
+const SPEC_LABELS: Record<SpecField, string> = {
+  size: "Size",
+  color: "Color",
+};
+
+const CATEGORY_NOUNS = new Intl.ListFormat("en", {
+  style: "long",
+  type: "conjunction",
+}).format(CATEGORIES.map((c) => c.pluralNoun));
+
+const ALL_BLURB = `Browse the full range: ${CATEGORY_NOUNS}, delivered nationwide across South Africa.`;
+
+const unique = <T,>(values: ReadonlyArray<T>): T[] => Array.from(new Set(values));
 
 function StockBadge({ productId }: { productId: string }) {
   const stock = useStock(productId);
@@ -28,6 +59,44 @@ function StockBadge({ productId }: { productId: string }) {
   return null;
 }
 
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+function FilterGroup({
+  label,
+  options,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  options: ReadonlyArray<FilterOption>;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm font-medium text-muted mr-1">{label}:</span>
+      {[{ value: ALL, label: "All" }, ...options].map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onSelect(option.value)}
+          aria-pressed={selected === option.value}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            selected === option.value
+              ? "bg-foreground text-white"
+              : "bg-surface text-muted hover:text-foreground"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const { addItem, items: cartItems } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -45,22 +114,54 @@ export default function ProductsPage() {
         setAddedId((prev) => (prev === product.id ? null : prev));
       }, 1500);
     };
-  const [sizeFilter, setSizeFilter] = useState<string>("all");
-  const [colorFilter, setColorFilter] = useState<string>("all");
+  const [category, setCategory] = useState<CategorySelection>(ALL);
+  const [specs, setSpecs] = useState<SpecSelection>({});
+
+  // Only the categories in view offer filters, so picking Audio Interfaces
+  // drops the size/colour rows entirely and "All" offers the union.
+  const scope =
+    category === ALL ? CATEGORIES : CATEGORIES.filter((c) => c.id === category);
+
+  const specFilters = unique(scope.flatMap((c) => c.filters)).map((field) => ({
+    field,
+    label: SPEC_LABELS[field],
+    values: unique(
+      scope.flatMap((c) =>
+        c.filters.includes(field) ? specValues(field, c.id) : [],
+      ),
+    ),
+  }));
 
   const filtered = live.filter((p) => {
     if (!p.inStock) return false;
-    if (sizeFilter !== "all" && p.size !== sizeFilter) return false;
-    if (colorFilter !== "all" && p.color !== colorFilter) return false;
-    return true;
+    if (category !== ALL && categoryOf(p).id !== category) return false;
+    return specFilters.every(
+      ({ field }) => !specs[field] || p[field] === specs[field],
+    );
   });
 
-  const clearFilters = () => {
-    setSizeFilter("all");
-    setColorFilter("all");
+  const selectCategory = (value: string) => {
+    setCategory(isCategoryId(value) ? value : ALL);
+    // Spec values are category-scoped, so a stale pick would silently empty
+    // the grid after switching.
+    setSpecs({});
   };
 
-  const hasFilters = sizeFilter !== "all" || colorFilter !== "all";
+  const selectSpec = (field: SpecField, value: string) => {
+    setSpecs((prev) => ({
+      ...prev,
+      [field]: value === ALL ? undefined : value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setCategory(ALL);
+    setSpecs({});
+  };
+
+  const hasFilters = category !== ALL || Object.values(specs).some(Boolean);
+
+  const active = category === ALL ? undefined : categoryById(category);
 
   return (
     <>
@@ -70,12 +171,10 @@ export default function ProductsPage() {
             Shop
           </p>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-            All Drumsticks
+            {active ? active.label : "All Products"}
           </h1>
           <p className="text-lg text-muted max-w-2xl">
-            Premium American Hickory drumsticks. From R150 per pair. Available
-            in 5 sizes and a full range of colours, plus our premium Silver
-            Blade edition.
+            {active ? active.blurb : ALL_BLURB}
           </p>
         </div>
       </section>
@@ -83,63 +182,32 @@ export default function ProductsPage() {
       <section className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 mb-10">
-            <span className="text-sm font-medium text-muted mr-1">Size:</span>
-            <button
-              onClick={() => setSizeFilter("all")}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                sizeFilter === "all"
-                  ? "bg-foreground text-white"
-                  : "bg-surface text-muted hover:text-foreground"
-              }`}
-            >
-              All
-            </button>
-            {sizes.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSizeFilter(s)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  sizeFilter === s
-                    ? "bg-foreground text-white"
-                    : "bg-surface text-muted hover:text-foreground"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-10">
+            <FilterGroup
+              label="Category"
+              selected={category}
+              onSelect={selectCategory}
+              options={CATEGORIES.map((c) => ({
+                value: c.id,
+                label: c.label,
+              }))}
+            />
 
-            <span className="text-sm font-medium text-muted ml-4 mr-1">
-              Color:
-            </span>
-            <button
-              onClick={() => setColorFilter("all")}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                colorFilter === "all"
-                  ? "bg-foreground text-white"
-                  : "bg-surface text-muted hover:text-foreground"
-              }`}
-            >
-              All
-            </button>
-            {colors.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColorFilter(c)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  colorFilter === c
-                    ? "bg-foreground text-white"
-                    : "bg-surface text-muted hover:text-foreground"
-                }`}
-              >
-                {c}
-              </button>
+            {specFilters.map(({ field, label, values }) => (
+              <FilterGroup
+                key={field}
+                label={label}
+                selected={specs[field] ?? ALL}
+                onSelect={(value) => selectSpec(field, value)}
+                options={values.map((value) => ({ value, label: value }))}
+              />
             ))}
 
             {hasFilters && (
               <button
+                type="button"
                 onClick={clearFilters}
-                className="text-xs text-muted hover:text-foreground transition-colors ml-2"
+                className="text-xs text-muted hover:text-foreground transition-colors"
               >
                 Clear all
               </button>
@@ -170,14 +238,11 @@ export default function ProductsPage() {
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute top-3 left-3 flex gap-1.5">
-                      <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full">
-                        {product.size}
-                      </span>
-                      <span className="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs font-medium px-2.5 py-1 rounded-full text-muted">
-                        {product.color}
-                      </span>
-                    </div>
+                    <SpecPills
+                      product={product}
+                      className="absolute top-3 left-3 flex gap-1.5"
+                      pillClassName="bg-white/90 backdrop-blur-sm text-[10px] sm:text-xs px-2.5 py-1 rounded-full"
+                    />
                     <button
                       type="button"
                       onClick={quickAdd(product, soldOut, capReached)}
@@ -222,6 +287,7 @@ export default function ProductsPage() {
                 No products match your filters.
               </p>
               <button
+                type="button"
                 onClick={clearFilters}
                 className="text-sm font-medium text-accent hover:text-accent-dark transition-colors"
               >
